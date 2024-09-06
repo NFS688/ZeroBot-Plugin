@@ -111,8 +111,6 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 			}
 			return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, "abcd", true, 0)
 		case 5:
-			return aireply.NewLolimiAi(aireply.GPT4oURL, aireply.GPT4oBotName, "abcd", true, 0)
-		case 6:
 			return aireply.NewLolimiAi(aireply.C4oURL, aireply.C4oBotName, "abcd", true, 20)
 		}
 	}
