@@ -117,7 +117,7 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 			return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 		case 5:
 			k := 既.k
-			return aireply.NewLolimiAi(aireply.C4oURL, aireply.C4oBotName, k, true, 20)
+			return aireply.NewLolimiAi(aireply.GPT4oURL, aireply.GPT4oBotName, k, true, 20)
 		}
 	}
 	return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
