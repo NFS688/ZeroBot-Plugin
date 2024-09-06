@@ -17,7 +17,7 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
-var replmd = replymode([]string{"婧枫", "沫沫", "青云客", "小爱", "ChatGPT"})
+var replmd = replymode([]string{"婧枫", "沫沫", "青云客", "小爱", "ChatGPT", "GPT4o"})
 
 var ttsmd = newttsmode()
 
@@ -40,7 +40,7 @@ func init() { // 插件主体
 	enr := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
 		Brief:             "人工智能回复",
-		Help:              "- @Bot 任意文本(任意一句话回复)\n- 设置文字回复模式[婧枫|沫沫|青云客|小爱|ChatGPT]\n- 设置 ChatGPT api key xxx",
+		Help:              "- @Bot 任意文本(任意一句话回复)\n- 设置文字回复模式[婧枫|沫沫|青云客|小爱|ChatGPT|GPT4o]\n- 设置 ChatGPT api key xxx",
 		PrivateDataFolder: "aireply",
 	})
 
