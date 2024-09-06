@@ -95,11 +95,11 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 		gid = -ctx.Event.UserID
 	}
 	m, ok := ctx.State["manager"].(*ctrl.Control[*zero.Ctx])
-	k := 既.k
-	if k == "" {
-		 return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
-	}
 	if ok {
+		k := 既.k
+		if k == "" {
+		 	return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
+		}
 		switch m.GetData(gid) & 0xff {
 		case 0:
 			return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, k, true, 0)
