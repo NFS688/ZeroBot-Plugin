@@ -95,12 +95,17 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 		gid = -ctx.Event.UserID
 	}
 	m, ok := ctx.State["manager"].(*ctrl.Control[*zero.Ctx])
+	k := 既.k
+	if k == "" {
+		ctx.SendChain(message.Text("ERROR: apikey为空或不正确！"))
+		return 
+	}
 	if ok {
 		switch m.GetData(gid) & 0xff {
 		case 0:
-			return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, "abcd", true, 0)
+			return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, k, true, 0)
 		case 1:
-			return aireply.NewLolimiAi(aireply.MomoURL, aireply.MomoBotName, "abcd", true, 0)
+			return aireply.NewLolimiAi(aireply.MomoURL, aireply.MomoBotName, k, true, 0)
 		case 2:
 			return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 		case 3:
@@ -110,12 +115,13 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 			if k != "" {
 				return aireply.NewChatGPT(aireply.ChatGPTURL, k)
 			}
-			return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, "abcd", true, 0)
+			return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 		case 5:
-			return aireply.NewLolimiAi(aireply.C4oURL, aireply.C4oBotName, "abcd", true, 20)
+			k := 既.k
+			return aireply.NewLolimiAi(aireply.C4oURL, aireply.C4oBotName, k, true, 20)
 		}
 	}
-	return aireply.NewLolimiAi(aireply.JingfengURL, aireply.JingfengBotName, "abcd", true, 0)
+	return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 }
 
 var ttsins = func() map[string]tts.TTS {
