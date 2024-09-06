@@ -60,7 +60,7 @@ var (
 	原  = newapikeystore("./data/tts/o.txt")
 	ཆཏ = newapikeystore("./data/tts/c.txt")
 	百  = newapikeystore("./data/tts/b.txt")
-	既 = newapikeystore("./data/tts/g.txt")
+	既  = newapikeystore("./data/tts/g.txt")
 )
 
 type replymode []string
@@ -98,7 +98,7 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 	if ok {
 		k := 既.k
 		if k == "" {
-		 	return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
+			return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 		}
 		switch m.GetData(gid) & 0xff {
 		case 0:
