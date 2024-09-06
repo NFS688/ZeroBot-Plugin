@@ -40,7 +40,7 @@ func init() { // 插件主体
 	enr := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
 		Brief:             "人工智能回复",
-		Help:              "- @Bot 任意文本(任意一句话回复)\n- 设置文字回复模式[婧枫|沫沫|青云客|小爱|ChatGPT|GPT4o]\n- 设置 ChatGPT api key xxx",
+		Help:              "- @Bot 任意文本(任意一句话回复)\n- 设置文字回复模式[婧枫|沫沫|青云客|小爱|ChatGPT|GPT4o]\n- 设置 ChatGPT api key xxx\n- 设置 lolimi api key xxx\n",
 		PrivateDataFolder: "aireply",
 	})
 
@@ -65,6 +65,14 @@ func init() { // 插件主体
 	enr.OnPrefix("设置文字回复模式", zero.AdminPermission).SetBlock(true).Handle(setReplyMode)
 	enr.OnRegex(`^设置\s*ChatGPT\s*api\s*key\s*(.*)$`, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		err := ཆཏ.set(ctx.State["regex_matched"].([]string)[1])
+		if err != nil {
+			ctx.SendChain(message.Text("ERROR: ", err))
+			return
+		}
+		ctx.SendChain(message.Text("设置成功"))
+	})
+	enr.OnRegex(`^设置\s*lolimi\s*api\s*key\s*(.*)$`, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+		err := 既.set(ctx.State["regex_matched"].([]string)[1])
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
 			return
