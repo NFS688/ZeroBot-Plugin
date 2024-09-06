@@ -97,8 +97,7 @@ func (r replymode) getReplyMode(ctx *zero.Ctx) aireply.AIReply {
 	m, ok := ctx.State["manager"].(*ctrl.Control[*zero.Ctx])
 	k := 既.k
 	if k == "" {
-		ctx.SendChain(message.Text("ERROR: apikey为空或不正确！"))
-		return 
+		 return aireply.NewQYK(aireply.QYKURL, aireply.QYKBotName)
 	}
 	if ok {
 		switch m.GetData(gid) & 0xff {
