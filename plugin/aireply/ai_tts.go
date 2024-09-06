@@ -60,6 +60,7 @@ var (
 	原  = newapikeystore("./data/tts/o.txt")
 	ཆཏ = newapikeystore("./data/tts/c.txt")
 	百  = newapikeystore("./data/tts/b.txt")
+	既 = newapikeystore("./data/tts/g.txt")
 )
 
 type replymode []string
