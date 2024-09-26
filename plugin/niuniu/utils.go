@@ -2,79 +2,150 @@
 package niuniu
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
+	"time"
 )
 
-func useWeiGe(niuniu float64) (string, float64) {
-	reduce := math.Abs(hitGlue(niuniu))
-	niuniu += reduce
-	return randomChoice([]string{
-		fmt.Sprintf("哈哈，你这一用道具，牛牛就像是被激发了潜能，增加了%.2fcm！看来今天是个大日子呢！", reduce),
-		fmt.Sprintf("你这是用了什么神奇的道具？牛牛竟然增加了%.2fcm，简直是牛气冲天！", reduce),
-		fmt.Sprintf("“使用道具后，你的牛牛就像是开启了加速模式，一下增加了%.2fcm，这成长速度让人惊叹！", reduce),
-	}), niuniu
-}
-
-func usePhilter(niuniu float64) (string, float64) {
-	reduce := math.Abs(hitGlue(niuniu))
-	niuniu -= reduce
-	return randomChoice([]string{
-		fmt.Sprintf("你使用媚药,咿呀咿呀一下使当前长度发生了一些变化，当前长度%.2f", niuniu),
-		fmt.Sprintf("看来你追求的是‘微观之美’，故意使用道具让牛牛凹进去了%.2fcm！", reduce),
-		fmt.Sprintf("‘缩小奇迹’在你身上发生了，牛牛凹进去了%.2fcm，你的选择真是独特！", reduce),
-	}), niuniu
-}
-
-func useArtifact(myLength, adduserniuniu float64) (string, float64, float64) {
-	difference := myLength - adduserniuniu
+func createUserInfoByProps(props string, niuniu *userInfo) (userInfo, error) {
 	var (
-		change float64
+		err error
 	)
-	if difference > 0 {
-		change = hitGlue(myLength + adduserniuniu)
-	} else {
-		change = hitGlue((myLength + adduserniuniu) / 2)
+	switch props {
+	case "伟哥":
+		if niuniu.WeiGe > 0 {
+			niuniu.WeiGe--
+		} else {
+			err = errors.New("你还没有伟哥呢,不能使用")
+		}
+	case "媚药":
+		if niuniu.Philter > 0 {
+			niuniu.Philter--
+		} else {
+			err = errors.New("你还没有媚药呢,不能使用")
+		}
+	case "击剑神器":
+		if niuniu.Artifact > 0 {
+			niuniu.Artifact--
+		} else {
+			err = errors.New("你还没有击剑神器呢,不能使用")
+		}
+	case "击剑神稽":
+		if niuniu.ShenJi > 0 {
+			niuniu.ShenJi--
+		} else {
+			err = errors.New("你还没有击剑神稽呢,不能使用")
+		}
+	default:
+		err = errors.New("道具不存在")
 	}
-	myLength += change
-	return randomChoice([]string{
-		fmt.Sprintf("凭借神秘道具的力量，你让对方在你的长度面前俯首称臣！你的长度增加了%.2fcm，当前长度达到了%.2fcm", change, myLength),
-		fmt.Sprintf("神器在手，天下我有！你使用道具后，长度猛增%.2fcm，现在的总长度是%.2fcm，无人能敌！", change, myLength),
-		fmt.Sprintf("这就是道具的魔力！你轻松增加了%.2fcm，让对手望尘莫及，当前长度为%.2fcm！", change, myLength),
-		fmt.Sprintf("道具一出，谁与争锋！你的长度因道具而增长%.2fcm，现在的长度是%.2fcm，霸气尽显！", change, myLength),
-		fmt.Sprintf("使用道具的你，如同获得神助！你的长度增长了%.2fcm，达到%.2fcm的惊人长度，胜利自然到手！", change, myLength),
-	}), myLength, adduserniuniu - change/1.3
+	return *niuniu, err
 }
 
-func useShenJi(myLength, adduserniuniu float64) (string, float64, float64) {
-	difference := myLength - adduserniuniu
+// 接收值依次是 自己和被jj用户的信息 一个包含gid和uid的字符串 道具名称
+// 返回值依次是 要发生的消息 被jj用户的niuniu 用户的信息 错误信息
+func processJJuAction(myniuniu, adduserniuniu *userInfo, t string, props string) (string, float64, userInfo, error) {
 	var (
-		change float64
+		fencingResult string
+		f             float64
+		f1            float64
+		u             userInfo
+		err           error
 	)
-	if difference > 0 {
-		change = hitGlue(myLength + adduserniuniu)
-	} else {
-		change = hitGlue((myLength + adduserniuniu) / 2)
+	v, ok := prop.Load(t)
+	if props != "" {
+		if props != "击剑神器" && props != "击剑神稽" {
+			return "", 0, userInfo{}, errors.New("道具不存在")
+		}
+		u, err = createUserInfoByProps(props, myniuniu)
+		if err != nil {
+			return "", 0, userInfo{}, err
+		}
 	}
-	myLength -= change
-	var r string
-	if myLength > 0 {
-		r = randomChoice([]string{
-			fmt.Sprintf("哦吼！？看来你的牛牛因为使用了神秘道具而缩水了呢🤣🤣🤣！缩小了%.2fcm！", change),
-			fmt.Sprintf("哈哈，看来这个道具有点儿调皮，让你的长度缩水了%.2fcm！现在你的长度是%.2fcm，下次可得小心使用哦！", change, myLength),
-			fmt.Sprintf("使用道具后，你的牛牛似乎有点儿害羞，缩水了%.2fcm！现在的长度是%.2fcm，希望下次它能挺直腰板！", change, myLength),
-			fmt.Sprintf("哎呀，这个道具的效果有点儿意外，你的长度减少了%.2fcm，现在只有%.2fcm了！下次选道具可得睁大眼睛！", change, myLength),
-		})
-	} else {
-		r = randomChoice([]string{
-			fmt.Sprintf("哦哟，小姐姐真是玩得一手好游戏，使用道具后数值又降低了%.2fcm，小巧得更显魅力！", change),
-			fmt.Sprintf("看来小姐姐喜欢更加精致的风格，使用道具后，数值减少了%.2fcm，更加迷人了！", change),
-			fmt.Sprintf("小姐姐的每一次变化都让人惊喜，使用道具后，数值减少了%.2fcm，更加优雅动人！", change),
-			fmt.Sprintf("小姐姐这是在展示什么是真正的精致小巧，使用道具后，数值减少了%.2fcm，美得不可方物！", change),
-		})
+	switch {
+	case ok && v.Count > 1 && time.Since(v.TimeLimit) < time.Minute*8:
+		fencingResult, f, f1 = fencing(myniuniu.Length, adduserniuniu.Length)
+		u.Length = f
+		errMessage := fmt.Sprintf("你使用道具次数太快了，此次道具不会生效，等待%d再来吧", time.Minute*8-time.Since(v.TimeLimit))
+		err = errors.New(errMessage)
+	case myniuniu.ShenJi-u.ShenJi != 0:
+		fencingResult, f, f1 = myniuniu.useShenJi(adduserniuniu.Length)
+		u.Length = f
+		updateMap(t, true)
+	case myniuniu.Artifact-u.Artifact != 0:
+		fencingResult, f, f1 = myniuniu.useArtifact(adduserniuniu.Length)
+		u.Length = f
+		updateMap(t, true)
+	default:
+		fencingResult, f, f1 = fencing(myniuniu.Length, adduserniuniu.Length)
+		u.Length = f
 	}
-	return r, myLength, adduserniuniu + 0.7*change
+	return fencingResult, f1, u, err
+}
+func processNiuniuAction(t string, niuniu *userInfo, props string) (string, userInfo, error) {
+	var (
+		messages string
+		f        float64
+		u        userInfo
+		err      error
+	)
+	load, ok := prop.Load(t)
+	if props != "" {
+		if props != "伟哥" && props != "媚药" {
+			return "", u, errors.New("道具不存在")
+		}
+		u, err = createUserInfoByProps(props, niuniu)
+		if err != nil {
+			return "", userInfo{}, err
+		}
+	}
+	switch {
+	case ok && load.Count > 1 && time.Since(load.TimeLimit) < time.Minute*8:
+		messages, f = generateRandomStingTwo(niuniu.Length)
+		u.Length = f
+		u.UID = niuniu.UID
+		errMessage := fmt.Sprintf("你使用道具次数太快了，此次道具不会生效，等待%d再来吧", time.Minute*8-time.Since(load.TimeLimit))
+		err = errors.New(errMessage)
+	case niuniu.WeiGe-u.WeiGe != 0:
+		messages, f = niuniu.useWeiGe()
+		u.Length = f
+		updateMap(t, true)
+	case niuniu.Philter-u.Philter != 0:
+		messages, f = niuniu.usePhilter()
+		u.Length = f
+		updateMap(t, true)
+	default:
+		messages, f = generateRandomStingTwo(niuniu.Length)
+		u.Length = f
+		u.UID = niuniu.UID
+	}
+	return messages, u, err
+}
+
+func purchaseItem(n int, info userInfo) (*userInfo, int, error) {
+	var (
+		money int
+		err   error
+	)
+	switch n {
+	case 1:
+		money = 300
+		info.WeiGe += 5
+	case 2:
+		money = 300
+		info.Philter += 5
+	case 3:
+		money = 500
+		info.Artifact += 2
+	case 4:
+		money = 500
+		info.ShenJi += 2
+	default:
+		err = errors.New("无效的选择")
+	}
+	return &info, money, err
 }
 
 func generateRandomStingTwo(niuniu float64) (string, float64) {
@@ -100,13 +171,12 @@ func generateRandomStingTwo(niuniu float64) (string, float64) {
 				fmt.Sprintf("你突发恶疾！你的牛牛凹进去了%.2fcm！", reduce),
 				fmt.Sprintf("笑死，你因为打🦶过度导致牛牛凹进去了%.2fcm！🤣🤣🤣", reduce),
 			}), niuniu
-		} else {
-			return randomChoice([]string{
-				fmt.Sprintf("阿哦，你过度打🦶，牛牛缩短%.2fcm了呢！", reduce),
-				fmt.Sprintf("你的牛牛变长了很多，你很激动地继续打🦶，然后牛牛缩短了%.2fcm呢！", reduce),
-				fmt.Sprintf("小打怡情，大打伤身，强打灰飞烟灭！你过度打🦶，牛牛缩短了%.2fcm捏！", reduce),
-			}), niuniu
 		}
+		return randomChoice([]string{
+			fmt.Sprintf("阿哦，你过度打🦶，牛牛缩短%.2fcm了呢！", reduce),
+			fmt.Sprintf("你的牛牛变长了很多，你很激动地继续打🦶，然后牛牛缩短了%.2fcm呢！", reduce),
+			fmt.Sprintf("小打怡情，大打伤身，强打灰飞烟灭！你过度打🦶，牛牛缩短了%.2fcm捏！", reduce),
+		}), niuniu
 	}
 }
 
@@ -262,13 +332,13 @@ func hitGlue(l float64) float64 {
 	l = math.Abs(l)
 	switch {
 	case l > 1 && l <= 10:
-		return rand.Float64() * math.Log2(l)
+		return rand.Float64() * math.Log2(l*2)
 	case 10 < l && l <= 100:
-		return rand.Float64() * math.Log2(l*1.5) / 2
+		return rand.Float64() * math.Log2(l*1.5)
 	case 100 < l && l <= 1000:
-		return rand.Float64() * math.Log10(l*1.5) / 2
+		return rand.Float64() * (math.Log10(l*1.5) * 2)
 	case l > 1000:
-		return rand.Float64() * math.Log10(l) / 2
+		return rand.Float64() * (math.Log10(l) * 2)
 	default:
 		return rand.Float64()
 	}
