@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	backgroundURL = "https://api.mtyqx.cn/api/random.php"
+	backgroundURL = "https://t.mwm.moe/fj"
 	referer       = "https://weibo.com/"
 	signinMax     = 1
 	// SCOREMAX 分数上限定为1200
