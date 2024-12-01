@@ -30,7 +30,6 @@ import (
 
 const (
 	backgroundURL = "https://t.alcy.cc/fj"
-	// referer       = "https://weibo.com/"
 	signinMax     = 1
 	// SCOREMAX 分数上限定为1200
 	SCOREMAX = 1200
@@ -156,8 +155,6 @@ func init() {
 			level:      level,
 			rank:       rank,
 		}
-		url, err := bilibili.GetRealURL(backgroundURL)
-		ctx.SendChain(message.Text("RealURL: ", url))
 		drawimage, err := styles[k](alldata)
 		if err != nil {
 			ctx.SendChain(message.Text("签到成功，但签到图生成失败，请勿重复签到:\n", err))
