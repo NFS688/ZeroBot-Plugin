@@ -30,13 +30,14 @@ import (
 
 const (
 	backgroundURL = "https://t.alcy.cc/fj"
-	referer       = "https://weibo.com/"
+	// referer       = "https://weibo.com/"
 	signinMax     = 1
 	// SCOREMAX 分数上限定为1200
 	SCOREMAX = 1200
 )
 
 var (
+	ua       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36"
 	rankArray = [...]int{0, 10, 20, 50, 100, 200, 350, 550, 750, 1000, 1200}
 	engine    = control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
@@ -338,7 +339,7 @@ func initPic(picFile string, uid int64) (avatar []byte, err error) {
 		// 使用本地已有的图片
 		return avatar, copyImage(picFile)
 	}
-	data, err := web.RequestDataWith(web.NewDefaultClient(), url, "", referer, "", nil)
+	data, err := web.RequestDataWith(web.NewDefaultClient(), url, "GET", "", ua, nil)
 	if err != nil {
 		return
 	}
