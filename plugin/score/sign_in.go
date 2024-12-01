@@ -322,7 +322,7 @@ func getrank(count int) int {
 	return -1
 }
 
-func initPic(picFile string, uid int64) (avatar []byte, err error) {
+func initPic(picFile string, uid int64) (avatar []byte, err error, ctx *zero.Ctx) {
 	defer process.SleepAbout1sTo2s()
 	avatar, err = web.GetData("https://q4.qlogo.cn/g?b=qq&nk=" + strconv.FormatInt(uid, 10) + "&s=640")
 	if err != nil {
