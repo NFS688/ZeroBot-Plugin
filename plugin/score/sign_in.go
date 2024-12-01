@@ -155,6 +155,8 @@ func init() {
 			level:      level,
 			rank:       rank,
 		}
+		url, err := bilibili.GetRealURL(backgroundURL)
+		ctx.SendChain(message.Text("RealURL: ", url))
 		drawimage, err := styles[k](alldata)
 		if err != nil {
 			ctx.SendChain(message.Text("签到成功，但签到图生成失败，请勿重复签到:\n", err))
@@ -322,7 +324,7 @@ func getrank(count int) int {
 	return -1
 }
 
-func initPic(picFile string, uid int64) (avatar []byte, err error, ctx *zero.Ctx) {
+func initPic(picFile string, uid int64) (avatar []byte, err error) {
 	defer process.SleepAbout1sTo2s()
 	avatar, err = web.GetData("https://q4.qlogo.cn/g?b=qq&nk=" + strconv.FormatInt(uid, 10) + "&s=640")
 	if err != nil {
@@ -332,8 +334,6 @@ func initPic(picFile string, uid int64) (avatar []byte, err error, ctx *zero.Ctx
 		return
 	}
 	url, err := bilibili.GetRealURL(backgroundURL)
-	ctx.SendChain(message.Text("Realurl: ",url ))
-	return
 	if err != nil {
 		// 使用本地已有的图片
 		return avatar, copyImage(picFile)
