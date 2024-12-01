@@ -332,6 +332,7 @@ func initPic(picFile string, uid int64) (avatar []byte, err error) {
 		return
 	}
 	url, err := bilibili.GetRealURL(backgroundURL)
+	ctx.SendChain(message.Text("Realurl: ",url ))
 	if err != nil {
 		// 使用本地已有的图片
 		return avatar, copyImage(picFile)
