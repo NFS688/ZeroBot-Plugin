@@ -23,21 +23,20 @@ import (
 	"github.com/FloatTech/zbputils/ctxext"
 	"github.com/FloatTech/zbputils/img/text"
 	"github.com/golang/freetype"
-	log "github.com/sirupsen/logrus"
 	"github.com/wcharczuk/go-chart/v2"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
 const (
-	backgroundURL = "https://pic.re/image"
-	referer       = "https://weibo.com/"
+	backgroundURL = "https://t.alcy.cc/fj"
 	signinMax     = 1
 	// SCOREMAX 分数上限定为1200
 	SCOREMAX = 1200
 )
 
 var (
+	ua        = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36"
 	rankArray = [...]int{0, 10, 20, 50, 100, 200, 350, 550, 750, 1000, 1200}
 	engine    = control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
@@ -333,15 +332,15 @@ func initPic(picFile string, uid int64) (avatar []byte, err error) {
 		return
 	}
 	url, err := bilibili.GetRealURL(backgroundURL)
-	if err == nil {
-		data, err := web.RequestDataWith(web.NewDefaultClient(), url, "", referer, "", nil)
-		if err == nil {
-			return avatar, os.WriteFile(picFile, data, 0644)
-		}
+	if err != nil {
+		// 使用本地已有的图片
+		return avatar, copyImage(picFile)
 	}
-	// 获取网络图片失败，使用本地已有的图片
-	log.Error("[score:get online img error]:", err)
-	return avatar, copyImage(picFile)
+	data, err := web.RequestDataWith(web.NewDefaultClient(), url, "GET", "", ua, nil)
+	if err != nil {
+		return
+	}
+	return avatar, os.WriteFile(picFile, data, 0644)
 }
 
 // 使用"file:"发送图片失败后，改用base64发送
