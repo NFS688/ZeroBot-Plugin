@@ -26,7 +26,7 @@ type fishdb struct {
 }
 
 // FishLimit 钓鱼次数上限
-const FishLimit = 150
+const FishLimit = 2000
 
 // version 规则版本号
 const version = "5.6.1"
