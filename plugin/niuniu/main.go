@@ -420,8 +420,8 @@ func fixedStore(gid, uid int64, n int) error {
 		ShenJi   int     `db:"shenji"`
 	}
 
-	// Get the user's niuniu info
-	niuInfo, err := niu.GetWordNiuNiu(gid, uid)
+	// 检查用户是否存在
+	_, err := niu.GetWordNiuNiu(gid, uid)
 	if err != nil {
 		return err
 	}
