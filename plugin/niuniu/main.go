@@ -412,12 +412,18 @@ func init() {
 func fixedStore(gid, uid int64, n int) error {
 	// Define the user info struct to match the database schema
 	type userInfoStruct struct {
-		UID      int64   `db:"uid"`
-		Length   float64 `db:"length"`
-		WeiGe    int     `db:"weige"`
-		Philter  int     `db:"philter"`
-		Artifact int     `db:"artifact"`
-		ShenJi   int     `db:"shenji"`
+		UID       int64   `db:"uid"`
+		Length    float64 `db:"length"`
+		UserCount int     `db:"usercount"`
+		WeiGe     int     `db:"weige"`
+		Philter   int     `db:"philter"`
+		Artifact  int     `db:"artifact"`
+		ShenJi    int     `db:"shenji"`
+		Buff1     int     `db:"buff1"`
+		Buff2     int     `db:"buff2"`
+		Buff3     int     `db:"buff3"`
+		Buff4     int     `db:"buff4"`
+		Buff5     int     `db:"buff5"`
 	}
 
 	// 检查用户是否存在
@@ -445,94 +451,68 @@ func fixedStore(gid, uid int64, n int) error {
 
 	// If the bags are the same, it means the items weren't added to the inventory
 	if bagBefore == bagAfter {
-		// Manually update the user's inventory based on the purchase
+		// 打开数据库
+		db := sql.New("data/niuniu/niuniu.db")
+		if err := db.Open(time.Hour); err != nil {
+			return err
+		}
+		defer db.Close()
+
+		// 检查是否存在错误的表（使用uid而不是gid）
+		wrongTableName := strconv.FormatInt(uid, 10)
+		correctTableName := strconv.FormatInt(gid, 10)
+
+		// 获取所有表
+		tables, err := db.ListTables()
+		if err != nil {
+			return err
+		}
+
+		// 检查错误的表是否存在
+		wrongTableExists := false
+		for _, table := range tables {
+			if table == wrongTableName {
+				wrongTableExists = true
+				break
+			}
+		}
+
+		// 如果错误的表存在，尝试从中获取数据
+		var wrongUserInfo userInfoStruct
+		if wrongTableExists {
+			if err := db.Find(wrongTableName, &wrongUserInfo, "WHERE UID = ?", uid); err == nil {
+				// 找到了错误表中的数据，删除它
+				if err := db.Del(wrongTableName, "WHERE UID = ?", uid); err != nil {
+					return err
+				}
+			}
+		}
+
+		// 从正确的表中获取用户信息
+		var userInfo userInfoStruct
+		if err := db.Find(correctTableName, &userInfo, "WHERE UID = ?", uid); err != nil {
+			// 如果在正确的表中找不到用户，创建一个新的用户信息
+			userInfo = userInfoStruct{
+				UID:    uid,
+				Length: 0, // 默认长度，可以根据需要调整
+			}
+		}
+
+		// 根据购买的物品更新用户信息
 		switch n {
 		case 1: // 伟哥
-			// Add 5 WeiGe by directly modifying the database
-			db := sql.New("data/niuniu/niuniu.db")
-			if err := db.Open(time.Hour); err != nil {
-				return err
-			}
-			defer db.Close()
-
-			// Get the current user info
-			var userInfo userInfoStruct
-
-			tableName := strconv.FormatInt(gid, 10)
-			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
-				return err
-			}
-
-			// Update the WeiGe count
 			userInfo.WeiGe += 5
-
-			// Save the updated user info
-			if err := db.Insert(tableName, &userInfo); err != nil {
-				return err
-			}
-
 		case 2: // 媚药
-			// Add 5 Philter
-			db := sql.New("data/niuniu/niuniu.db")
-			if err := db.Open(time.Hour); err != nil {
-				return err
-			}
-			defer db.Close()
-
-			var userInfo userInfoStruct
-
-			tableName := strconv.FormatInt(gid, 10)
-			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
-				return err
-			}
-
 			userInfo.Philter += 5
-
-			if err := db.Insert(tableName, &userInfo); err != nil {
-				return err
-			}
-
 		case 3: // 击剑神器
-			// Add 2 Artifact
-			db := sql.New("data/niuniu/niuniu.db")
-			if err := db.Open(time.Hour); err != nil {
-				return err
-			}
-			defer db.Close()
-
-			var userInfo userInfoStruct
-
-			tableName := strconv.FormatInt(gid, 10)
-			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
-				return err
-			}
-
 			userInfo.Artifact += 2
-
-			if err := db.Insert(tableName, &userInfo); err != nil {
-				return err
-			}
-
 		case 4: // 击剑神稽
-			// Add 2 ShenJi
-			db := sql.New("data/niuniu/niuniu.db")
-			if err := db.Open(time.Hour); err != nil {
-				return err
-			}
-			defer db.Close()
-
-			var userInfo userInfoStruct
-
-			tableName := strconv.FormatInt(gid, 10)
-			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
-				return err
-			}
-
 			userInfo.ShenJi += 2
+		}
 
-			if err := db.Insert(tableName, &userInfo); err != nil {
-				return err
-			}
+		// 保存更新后的用户信息到正确的表
+		if err := db.Insert(correctTableName, &userInfo); err != nil {
+			return err
 		}
 	}
 
