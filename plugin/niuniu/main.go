@@ -105,6 +105,14 @@ func init() {
 	en.OnFullMatch("出售牛牛", zero.OnlyGroup).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		gid := ctx.Event.GroupID
 		uid := ctx.Event.UserID
+
+		// 在出售牛牛前，检查用户是否有jjCount记录，如果有则清除
+		jjKey := fmt.Sprintf("%d_%d", gid, uid)
+		if _, ok := jjCount.Load(jjKey); ok {
+			// 用户有jjCount记录，清除它
+			jjCount.Delete(jjKey)
+		}
+
 		sell, err := niu.Sell(gid, uid)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR:", err))
@@ -189,7 +197,17 @@ func init() {
 	en.OnFullMatch("赎牛牛", zero.OnlyGroup).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		gid := ctx.Event.GroupID
 		uid := ctx.Event.UserID
-		last, ok := jjCount.Load(fmt.Sprintf("%d_%d", gid, uid))
+
+		// 首先检查用户是否拥有牛牛
+		_, err := niu.GetWordNiuNiu(gid, uid)
+		if err != nil {
+			ctx.SendChain(message.Text("你还没有牛牛，请先注册牛牛"))
+			return
+		}
+
+		// 检查用户是否有jjCount记录
+		jjKey := fmt.Sprintf("%d_%d", gid, uid)
+		last, ok := jjCount.Load(jjKey)
 
 		if !ok {
 			ctx.SendChain(message.Text("你还没有被厥呢"))
@@ -198,7 +216,7 @@ func init() {
 
 		if time.Since(last.TimeLimit) > time.Hour {
 			ctx.SendChain(message.Text("时间已经过期了,牛牛已被收回!"))
-			jjCount.Delete(fmt.Sprintf("%d_%d", gid, uid))
+			jjCount.Delete(jjKey)
 			return
 		}
 
@@ -206,7 +224,17 @@ func init() {
 			ctx.SendChain(message.Text("你还没有被厥够4次呢,不能赎牛牛"))
 			return
 		}
-		ctx.SendChain(message.Text("再次确认一下哦,这次赎牛牛，牛牛长度将会变成", last.Length, "cm\n还需要嘛【是|否】"))
+
+		// 检查用户是否有足够的钱
+		money := wallet.GetWalletOf(uid)
+		if money < 150 {
+			ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要150%s，你只有%d%s，快去赚钱吧！",
+				wallet.GetWalletName(), money, wallet.GetWalletName())))
+			return
+		}
+
+		ctx.SendChain(message.Text("再次确认一下哦,这次赎牛牛需要支付150", wallet.GetWalletName(),
+			"，牛牛长度将会变成", last.Length, "cm\n还需要嘛【是|否】"))
 		recv, cancel := zero.NewFutureEvent("message", 999, false, zero.CheckUser(uid), zero.CheckGroup(gid), zero.RegexRule(`^(是|否)$`)).Repeat()
 		defer cancel()
 		timer := time.NewTimer(2 * time.Minute)
@@ -223,12 +251,41 @@ func init() {
 					return
 				}
 
-				if err := niu.Redeem(gid, uid, last.Length); err == nil {
-					ctx.SendChain(message.Text("ERROR:", err))
+				// 再次检查用户是否有足够的钱（可能在确认过程中花掉了）
+				money = wallet.GetWalletOf(uid)
+				if money < 150 {
+					ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要150%s，你只有%d%s，快去赚钱吧！",
+						wallet.GetWalletName(), money, wallet.GetWalletName())))
 					return
 				}
 
-				jjCount.Delete(fmt.Sprintf("%d_%d", gid, uid))
+				// 扣除用户的钱
+				if err := wallet.InsertWalletOf(uid, -150); err != nil {
+					ctx.SendChain(message.Text("ERROR: 扣除金钱失败:", err))
+					return
+				}
+
+				// 设置用户的牛牛长度
+				currentLength, err := niu.GetWordNiuNiu(gid, uid)
+				if err != nil {
+					ctx.SendChain(message.Text("ERROR: 获取当前牛牛长度失败:", err))
+					// 退还用户的钱
+					wallet.InsertWalletOf(uid, 150)
+					return
+				}
+
+				// 计算需要增加或减少的长度差值
+				lengthDiff := last.Length - currentLength
+
+				if err := niu.SetWordNiuNiu(gid, uid, lengthDiff); err != nil {
+					ctx.SendChain(message.Text("ERROR: 设置牛牛长度失败:", err))
+					// 如果设置失败，退还用户的钱
+					wallet.InsertWalletOf(uid, 150)
+					return
+				}
+
+				// 删除jjCount记录
+				jjCount.Delete(jjKey)
 
 				ctx.SendChain(message.At(uid), message.Text(fmt.Sprintf("恭喜你!成功赎回牛牛,当前长度为:%.2fcm", last.Length)))
 				return
@@ -385,6 +442,13 @@ func init() {
 		uid := ctx.Event.UserID
 		gid := ctx.Event.GroupID
 		key := fmt.Sprintf("%d_%d", gid, uid)
+
+		// 在注销牛牛前，检查用户是否有jjCount记录，如果有则清除
+		if _, ok := jjCount.Load(key); ok {
+			// 用户有jjCount记录，清除它
+			jjCount.Delete(key)
+		}
+
 		data, ok := register.Load(key)
 		switch {
 		case !ok || time.Since(data.TimeLimit) > time.Hour*12:
