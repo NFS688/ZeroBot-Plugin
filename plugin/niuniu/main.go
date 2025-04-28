@@ -270,7 +270,9 @@ func init() {
 				if err != nil {
 					ctx.SendChain(message.Text("ERROR: 获取当前牛牛长度失败:", err))
 					// 退还用户的钱
-					wallet.InsertWalletOf(uid, 150)
+					if refundErr := wallet.InsertWalletOf(uid, 150); refundErr != nil {
+						ctx.SendChain(message.Text("警告: 退款失败:", refundErr))
+					}
 					return
 				}
 
@@ -280,7 +282,9 @@ func init() {
 				if err := niu.SetWordNiuNiu(gid, uid, lengthDiff); err != nil {
 					ctx.SendChain(message.Text("ERROR: 设置牛牛长度失败:", err))
 					// 如果设置失败，退还用户的钱
-					wallet.InsertWalletOf(uid, 150)
+					if refundErr := wallet.InsertWalletOf(uid, 150); refundErr != nil {
+						ctx.SendChain(message.Text("警告: 退款失败:", refundErr))
+					}
 					return
 				}
 
