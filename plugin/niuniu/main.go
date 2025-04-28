@@ -227,13 +227,13 @@ func init() {
 
 		// 检查用户是否有足够的钱
 		money := wallet.GetWalletOf(uid)
-		if money < 150 {
-			ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要150%s，你只有%d%s，快去赚钱吧！",
+		if money < 500 {
+			ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要500%s，你只有%d%s，快去赚钱吧！",
 				wallet.GetWalletName(), money, wallet.GetWalletName())))
 			return
 		}
 
-		ctx.SendChain(message.Text("再次确认一下哦,这次赎牛牛需要支付150", wallet.GetWalletName(),
+		ctx.SendChain(message.Text("再次确认一下哦,这次赎牛牛需要支付500", wallet.GetWalletName(),
 			"，牛牛长度将会变成", last.Length, "cm\n还需要嘛【是|否】"))
 		recv, cancel := zero.NewFutureEvent("message", 999, false, zero.CheckUser(uid), zero.CheckGroup(gid), zero.RegexRule(`^(是|否)$`)).Repeat()
 		defer cancel()
@@ -253,14 +253,14 @@ func init() {
 
 				// 再次检查用户是否有足够的钱（可能在确认过程中花掉了）
 				money = wallet.GetWalletOf(uid)
-				if money < 150 {
-					ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要150%s，你只有%d%s，快去赚钱吧！",
+				if money < 500 {
+					ctx.SendChain(message.Text(fmt.Sprintf("赎牛牛需要500%s，你只有%d%s，快去赚钱吧！",
 						wallet.GetWalletName(), money, wallet.GetWalletName())))
 					return
 				}
 
 				// 扣除用户的钱
-				if err := wallet.InsertWalletOf(uid, -150); err != nil {
+				if err := wallet.InsertWalletOf(uid, -500); err != nil {
 					ctx.SendChain(message.Text("ERROR: 扣除金钱失败:", err))
 					return
 				}
@@ -270,7 +270,7 @@ func init() {
 				if err != nil {
 					ctx.SendChain(message.Text("ERROR: 获取当前牛牛长度失败:", err))
 					// 退还用户的钱
-					if refundErr := wallet.InsertWalletOf(uid, 150); refundErr != nil {
+					if refundErr := wallet.InsertWalletOf(uid, 500); refundErr != nil {
 						ctx.SendChain(message.Text("警告: 退款失败:", refundErr))
 					}
 					return
@@ -282,7 +282,7 @@ func init() {
 				if err := niu.SetWordNiuNiu(gid, uid, lengthDiff); err != nil {
 					ctx.SendChain(message.Text("ERROR: 设置牛牛长度失败:", err))
 					// 如果设置失败，退还用户的钱
-					if refundErr := wallet.InsertWalletOf(uid, 150); refundErr != nil {
+					if refundErr := wallet.InsertWalletOf(uid, 500); refundErr != nil {
 						ctx.SendChain(message.Text("警告: 退款失败:", refundErr))
 					}
 					return
@@ -363,12 +363,36 @@ func init() {
 	en.OnFullMatch("注册牛牛", zero.OnlyGroup).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		gid := ctx.Event.GroupID
 		uid := ctx.Event.UserID
+
+		// 检查用户是否已经注册过牛牛
+		_, err := niu.GetWordNiuNiu(gid, uid)
+		if err == nil {
+			ctx.SendChain(message.Text("你已经拥有牛牛了，不需要重复注册！"))
+			return
+		}
+
+		// 检查用户是否最近注销过牛牛
+		key := fmt.Sprintf("%d_%d", gid, uid)
+		data, ok := register.Load(key)
+		if ok && time.Since(data.TimeLimit) < time.Hour {
+			// 用户在一小时内注销过牛牛
+			ctx.SendChain(message.Text(fmt.Sprintf("你在%d分钟前刚刚注销过牛牛，请等待%d分钟后再次注册！",
+				int(time.Since(data.TimeLimit).Minutes()),
+				60-int(time.Since(data.TimeLimit).Minutes()))))
+			return
+		}
+
+		// 注册新牛牛
 		msg, err := niu.Register(gid, uid)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
 			return
 		}
-		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
+
+		// 提醒用户注册成功
+		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg,
+			"\n提示：如果你想注销牛牛，需要支付100", wallet.GetWalletName(),
+			"，并且在注销后1小时内不能重新注册。"))
 	})
 	en.OnMessage(zero.NewPattern(nil).Text(`^(?:.*使用(.*))??jj`).At().AsRule(),
 		zero.OnlyGroup).SetBlock(true).Limit(func(ctx *zero.Ctx) *rate.Limiter {
@@ -447,32 +471,86 @@ func init() {
 		gid := ctx.Event.GroupID
 		key := fmt.Sprintf("%d_%d", gid, uid)
 
-		// 在注销牛牛前，检查用户是否有jjCount记录，如果有则清除
-		if _, ok := jjCount.Load(key); ok {
-			// 用户有jjCount记录，清除它
-			jjCount.Delete(key)
+		// 检查用户是否有牛牛
+		_, err := niu.GetWordNiuNiu(gid, uid)
+		if err != nil {
+			ctx.SendChain(message.Text("你还没有牛牛，无需注销！"))
+			return
 		}
 
-		data, ok := register.Load(key)
-		switch {
-		case !ok || time.Since(data.TimeLimit) > time.Hour*12:
-			data = &lastLength{
-				TimeLimit: time.Now(),
-				Count:     1,
-			}
-		default:
-			if err := wallet.InsertWalletOf(uid, -data.Count*50); err != nil {
-				ctx.SendChain(message.Text("你的钱不够你注销牛牛了，这次注销需要", data.Count*50, wallet.GetWalletName()))
+		// 检查用户是否有足够的钱
+		money := wallet.GetWalletOf(uid)
+		if money < 100 {
+			ctx.SendChain(message.Text(fmt.Sprintf("注销牛牛需要支付100%s，你只有%d%s，快去赚钱吧！",
+				wallet.GetWalletName(), money, wallet.GetWalletName())))
+			return
+		}
+
+		// 提示用户确认注销
+		ctx.SendChain(message.Text("注意：注销牛牛将会消耗100", wallet.GetWalletName(),
+			"，并且在注销后1小时内不能重新注册。\n确定要注销吗？【是|否】"))
+
+		recv, cancel := zero.NewFutureEvent("message", 999, false, zero.CheckUser(uid), zero.CheckGroup(gid), zero.RegexRule(`^(是|否)$`)).Repeat()
+		defer cancel()
+		timer := time.NewTimer(1 * time.Minute)
+		defer timer.Stop()
+
+		for {
+			select {
+			case <-timer.C:
+				ctx.SendChain(message.Text("操作超时，已自动取消"))
+				return
+			case c := <-recv:
+				answer := c.Event.Message.String()
+				if answer == "否" {
+					ctx.SendChain(message.Text("已取消注销牛牛"))
+					return
+				}
+
+				// 再次检查用户是否有足够的钱
+				money = wallet.GetWalletOf(uid)
+				if money < 100 {
+					ctx.SendChain(message.Text(fmt.Sprintf("注销牛牛需要支付100%s，你只有%d%s，快去赚钱吧！",
+						wallet.GetWalletName(), money, wallet.GetWalletName())))
+					return
+				}
+
+				// 扣除用户的钱
+				if err := wallet.InsertWalletOf(uid, -100); err != nil {
+					ctx.SendChain(message.Text("ERROR: 扣除金钱失败:", err))
+					return
+				}
+
+				// 在注销牛牛前，检查用户是否有jjCount记录，如果有则清除
+				if _, ok := jjCount.Load(key); ok {
+					// 用户有jjCount记录，清除它
+					jjCount.Delete(key)
+				}
+
+				// 记录注销时间
+				data := &lastLength{
+					TimeLimit: time.Now(),
+					Count:     1,
+				}
+				register.Store(key, data)
+
+				// 执行注销
+				msg, err := niu.Cancel(gid, uid)
+				if err != nil {
+					ctx.SendChain(message.Text("ERROR: ", err))
+					// 如果注销失败，退还用户的钱
+					if refundErr := wallet.InsertWalletOf(uid, 100); refundErr != nil {
+						ctx.SendChain(message.Text("警告: 退款失败:", refundErr))
+					}
+					return
+				}
+
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg,
+					"\n提示：你已成功注销牛牛并支付了100", wallet.GetWalletName(),
+					"。在1小时内你将无法重新注册牛牛。"))
 				return
 			}
 		}
-		register.Store(key, data)
-		msg, err := niu.Cancel(gid, uid)
-		if err != nil {
-			ctx.SendChain(message.Text("ERROR: ", err))
-			return
-		}
-		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
 	})
 }
 
