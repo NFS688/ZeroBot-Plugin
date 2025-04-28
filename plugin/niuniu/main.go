@@ -9,6 +9,7 @@ import (
 
 	"github.com/FloatTech/AnimeAPI/niu"
 	"github.com/FloatTech/AnimeAPI/wallet"
+	sql "github.com/FloatTech/sqlite"
 	ctrl "github.com/FloatTech/zbpctrl"
 	"github.com/FloatTech/zbputils/control"
 	"github.com/FloatTech/zbputils/ctxext"
@@ -175,7 +176,7 @@ func init() {
 					return
 				}
 
-				if err = niu.Store(gid, uid, n); err != nil {
+				if err = fixedStore(gid, uid, n); err != nil {
 					ctx.SendChain(message.Text("ERROR: ", err))
 					return
 				}
@@ -405,6 +406,137 @@ func init() {
 		}
 		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
 	})
+}
+
+// fixedStore is a wrapper around niu.Store that fixes the bug where items are stored in the wrong table
+func fixedStore(gid, uid int64, n int) error {
+	// Define the user info struct to match the database schema
+	type userInfoStruct struct {
+		UID      int64   `db:"uid"`
+		Length   float64 `db:"length"`
+		WeiGe    int     `db:"weige"`
+		Philter  int     `db:"philter"`
+		Artifact int     `db:"artifact"`
+		ShenJi   int     `db:"shenji"`
+	}
+
+	// Get the user's niuniu info
+	niuInfo, err := niu.GetWordNiuNiu(gid, uid)
+	if err != nil {
+		return err
+	}
+
+	// Get the current inventory to check what items the user has
+	bagBefore, err := niu.Bag(gid, uid)
+	if err != nil {
+		return err
+	}
+
+	// Call the original Store function to process the purchase
+	if err := niu.Store(gid, uid, n); err != nil {
+		return err
+	}
+
+	// Check if the inventory was updated correctly
+	bagAfter, err := niu.Bag(gid, uid)
+	if err != nil {
+		return err
+	}
+
+	// If the bags are the same, it means the items weren't added to the inventory
+	if bagBefore == bagAfter {
+		// Manually update the user's inventory based on the purchase
+		switch n {
+		case 1: // 伟哥
+			// Add 5 WeiGe by directly modifying the database
+			db := sql.New("data/niuniu/niuniu.db")
+			if err := db.Open(time.Hour); err != nil {
+				return err
+			}
+			defer db.Close()
+
+			// Get the current user info
+			var userInfo userInfoStruct
+
+			tableName := strconv.FormatInt(gid, 10)
+			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
+				return err
+			}
+
+			// Update the WeiGe count
+			userInfo.WeiGe += 5
+
+			// Save the updated user info
+			if err := db.Insert(tableName, &userInfo); err != nil {
+				return err
+			}
+
+		case 2: // 媚药
+			// Add 5 Philter
+			db := sql.New("data/niuniu/niuniu.db")
+			if err := db.Open(time.Hour); err != nil {
+				return err
+			}
+			defer db.Close()
+
+			var userInfo userInfoStruct
+
+			tableName := strconv.FormatInt(gid, 10)
+			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
+				return err
+			}
+
+			userInfo.Philter += 5
+
+			if err := db.Insert(tableName, &userInfo); err != nil {
+				return err
+			}
+
+		case 3: // 击剑神器
+			// Add 2 Artifact
+			db := sql.New("data/niuniu/niuniu.db")
+			if err := db.Open(time.Hour); err != nil {
+				return err
+			}
+			defer db.Close()
+
+			var userInfo userInfoStruct
+
+			tableName := strconv.FormatInt(gid, 10)
+			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
+				return err
+			}
+
+			userInfo.Artifact += 2
+
+			if err := db.Insert(tableName, &userInfo); err != nil {
+				return err
+			}
+
+		case 4: // 击剑神稽
+			// Add 2 ShenJi
+			db := sql.New("data/niuniu/niuniu.db")
+			if err := db.Open(time.Hour); err != nil {
+				return err
+			}
+			defer db.Close()
+
+			var userInfo userInfoStruct
+
+			tableName := strconv.FormatInt(gid, 10)
+			if err := db.Find(tableName, &userInfo, "WHERE UID = ?", uid); err != nil {
+				return err
+			}
+
+			userInfo.ShenJi += 2
+
+			if err := db.Insert(tableName, &userInfo); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func randomChoice(options []string) string {
