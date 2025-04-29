@@ -383,14 +383,14 @@ func init() {
 		}
 
 		// 注册新牛牛
-		err := niu.Register(gid, uid)
+		msg, err := niu.Register(gid, uid)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
 			return
 		}
 
 		// 提醒用户注册成功
-		ctx.SendChain(message.Reply(ctx.Event.MessageID))
+		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
 	})
 	en.OnMessage(zero.NewPattern(nil).Text(`^(?:.*使用(.*))??jj`).At().AsRule(),
 		zero.OnlyGroup).SetBlock(true).Limit(func(ctx *zero.Ctx) *rate.Limiter {
@@ -543,8 +543,7 @@ func init() {
 					return
 				}
 
-				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg,
-					"在1小时内你无法重新注册牛牛。"))
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
 				return
 			}
 		}
