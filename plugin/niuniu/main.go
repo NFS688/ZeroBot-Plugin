@@ -383,7 +383,7 @@ func init() {
 		}
 
 		// 注册新牛牛
-		msg, err := niu.Register(gid, uid)
+		err := niu.Register(gid, uid)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
 			return
