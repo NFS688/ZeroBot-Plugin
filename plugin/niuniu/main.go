@@ -390,9 +390,7 @@ func init() {
 		}
 
 		// 提醒用户注册成功
-		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg,
-			"\n提示：如果你想注销牛牛，需要支付100", wallet.GetWalletName(),
-			"，并且在注销后1小时内不能重新注册。"))
+		ctx.SendChain(message.Reply(ctx.Event.MessageID))
 	})
 	en.OnMessage(zero.NewPattern(nil).Text(`^(?:.*使用(.*))??jj`).At().AsRule(),
 		zero.OnlyGroup).SetBlock(true).Limit(func(ctx *zero.Ctx) *rate.Limiter {
@@ -487,7 +485,7 @@ func init() {
 		}
 
 		// 提示用户确认注销
-		ctx.SendChain(message.Text("注意：注销牛牛将会消耗100", wallet.GetWalletName(),
+		ctx.SendChain(message.Text("注销牛牛将会消耗100", wallet.GetWalletName(),
 			"，并且在注销后1小时内不能重新注册。\n确定要注销吗？【是|否】"))
 
 		recv, cancel := zero.NewFutureEvent("message", 999, false, zero.CheckUser(uid), zero.CheckGroup(gid), zero.RegexRule(`^(是|否)$`)).Repeat()
@@ -546,8 +544,7 @@ func init() {
 				}
 
 				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg,
-					"\n提示：你已成功注销牛牛并支付了100", wallet.GetWalletName(),
-					"。在1小时内你将无法重新注册牛牛。"))
+					"在1小时内你无法重新注册牛牛。"))
 				return
 			}
 		}
