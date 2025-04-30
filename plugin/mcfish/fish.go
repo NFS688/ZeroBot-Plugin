@@ -310,7 +310,7 @@ func init() {
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
 						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
-						strconv.Itoa(rand.Intn(2))
+						strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2))
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
@@ -349,6 +349,33 @@ func init() {
 		err = dbdata.updateCurseFor(uid, "fish", fishNumber)
 		if err != nil {
 			logrus.Warnln(err)
+		}
+
+		// 经验修补附魔逻辑
+		if equipInfo.ExpRepair > 0 && equipInfo.Equip != "美西螈" && equipInfo.Durable < durationList[equipInfo.Equip] {
+			// 计算需要修复的耐久
+			maxRepair := durationList[equipInfo.Equip] - equipInfo.Durable
+			// 获取用户钱包余额
+			balance := wallet.GetWalletOf(uid)
+			// 计算可以修复的耐久（每点耐久消耗2点余额）
+			repairAmount := int(math.Min(maxRepair, balance/2))
+
+			if repairAmount > 0 {
+				// 扣除余额
+				err = wallet.InsertWalletOf(uid, -int64(repairAmount*2))
+				if err != nil {
+					logrus.Warnln("[ERROR at fish.go.exp-repair]:", err)
+				} else {
+					// 增加耐久
+					equipInfo.Durable += repairAmount
+					err = dbdata.updateUserEquip(equipInfo)
+					if err != nil {
+						logrus.Warnln("[ERROR at fish.go.exp-repair]:", err)
+					} else {
+						msg += "(经验修补恢复了" + strconv.Itoa(repairAmount) + "点耐久，消耗" + strconv.Itoa(repairAmount*2) + wallet.GetWalletName() + ")"
+					}
+				}
+			}
 		}
 		if len(thingNameList) == 1 {
 			thingName := ""

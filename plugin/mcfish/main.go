@@ -61,6 +61,7 @@ type equip struct {
 	Induce      int    // 诱钓等级
 	Favor       int    // 眷顾等级
 	Durability  int    // 耐久附魔等级
+	ExpRepair   int    // 经验修补附魔等级
 }
 
 type article struct {
