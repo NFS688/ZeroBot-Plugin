@@ -22,7 +22,7 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
 			return
 		}
-		if numberOfPole > 100 {
+		if numberOfPole > 30 {
 			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于30支的玩家不允许钓鱼"))
 			return
 		}
@@ -114,7 +114,17 @@ func init() {
 		fishNumber = residue
 		msg := ""
 		if equipInfo.Equip != "美西螈" {
-			equipInfo.Durable -= fishNumber
+			// 计算耐久消耗
+			durabilityLoss := 0
+			for i := 0; i < fishNumber; i++ {
+				// 根据耐久附魔等级计算是否消耗耐久
+				// 每次钓鱼有(60 + 40/(等级+1))%的几率会消耗耐久值
+				durabilityChance := 60 + 40/(equipInfo.Durability+1)
+				if rand.Intn(100) < durabilityChance {
+					durabilityLoss++
+				}
+			}
+			equipInfo.Durable -= durabilityLoss
 			err = dbdata.updateUserEquip(equipInfo)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5]:", err))
@@ -299,7 +309,8 @@ func init() {
 				if strings.Contains(thingName, "竿") {
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2))
+						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
+						strconv.Itoa(rand.Intn(2))
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
