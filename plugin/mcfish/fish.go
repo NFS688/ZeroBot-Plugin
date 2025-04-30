@@ -2,6 +2,7 @@
 package mcfish
 
 import (
+	"math"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -265,7 +266,12 @@ func init() {
 				default:
 					typeOfThing = "article"
 					picName = "book"
-					thingName = "诱钓"
+					// 经验修补附魔的获取概率为其他附魔的三分之一
+					if rand.Intn(100) < 25 { // 25% 概率获得经验修补附魔书
+						thingName = "经验修补"
+					} else {
+						thingName = "诱钓"
+					}
 				}
 			case dice >= probabilities["pole"].Min && dice < probabilities["pole"].Max: // 宝藏
 				typeOfThing = "pole"
