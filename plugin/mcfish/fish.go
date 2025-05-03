@@ -288,7 +288,7 @@ func init() {
 					typeOfThing = "fish"
 					picName = "海豚"
 					thingName = "海豚"
-				case dice probabilities["耐久"].Min && dice probabilities["耐久"].Max:
+				case dice >= probabilities["耐久"].Min && dice < probabilities["耐久"].Max:
 					typeOfThing = "article"
 					picName = "book"
 					thingName = "耐久"
