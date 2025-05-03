@@ -144,6 +144,13 @@ func init() {
 				strconv.FormatFloat(float64(probabilities[name].Max-probabilities[name].Min)*float64(probableList[0])/100, 'f', 2, 64),
 				"%\n"))
 		}
+		// 添加新附魔的概率信息
+		msg = append(msg, message.Text("耐久", " : ",
+			strconv.FormatFloat(float64(10)*float64(probableList[0])/100, 'f', 2, 64),
+			"%\n"))
+		msg = append(msg, message.Text("经验修补", " : ",
+			strconv.FormatFloat(float64(5)*float64(probableList[0])/100, 'f', 2, 64),
+			"%\n"))
 		msg = append(msg, message.Text("-----------\n鱼竿概率:\n"))
 		for _, name := range poleList {
 			if name != "美西螈" {
