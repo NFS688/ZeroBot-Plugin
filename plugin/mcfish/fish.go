@@ -341,11 +341,10 @@ func init() {
 			if thingName != "" {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
-					// 更新格式为: 耐久/维修次数/诱钓等级/眷顾等级/耐久等级/经验修补等级
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
 						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2))
+						strconv.Itoa(rand.Intn(3)) + "/0"
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
