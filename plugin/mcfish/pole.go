@@ -195,6 +195,14 @@ func init() {
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
+			durabilityLevel := 0
+			expRepairLevel := 0
+			if len(poleInfo) > 4 {
+				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+			}
+			if len(poleInfo) > 5 {
+				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+			}
 			poles = append(poles, equip{
 				ID:          uid,
 				Equip:       info.Name,
@@ -202,6 +210,8 @@ func init() {
 				Maintenance: maintenance,
 				Induce:      induceLevel,
 				Favor:       favorLevel,
+				Durability:  durabilityLevel,
+				ExpRepair:   expRepairLevel,
 			})
 		}
 		index := 0
@@ -279,6 +289,20 @@ func init() {
 				equipInfo.Favor = 3
 			}
 			msg += ",海之眷顾等级提升至" + enchantLevel[equipInfo.Favor]
+		}
+		if newEquipInfo.Durability != 0 && rand.Intn(100) < 50 {
+			equipInfo.Durability += newEquipInfo.Durability
+			if equipInfo.Durability > 3 {
+				equipInfo.Durability = 3
+			}
+			msg += ",耐久等级提升至" + enchantLevel[equipInfo.Durability]
+		}
+		if newEquipInfo.ExpRepair != 0 && rand.Intn(100) < 50 {
+			equipInfo.ExpRepair += newEquipInfo.ExpRepair
+			if equipInfo.ExpRepair > 1 {
+				equipInfo.ExpRepair = 1
+			}
+			msg += ",经验修补等级提升至" + enchantLevel[equipInfo.ExpRepair]
 		}
 		thingInfo := articles[index]
 		thingInfo.Number = 0
