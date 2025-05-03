@@ -26,7 +26,7 @@ type fishdb struct {
 }
 
 // FishLimit 钓鱼次数上限
-const FishLimit = 50
+const FishLimit = 2000
 
 // version 规则版本号
 const version = "5.6.2"
@@ -140,7 +140,7 @@ var (
 			"- 购买xxx / 购买xxx [数量]\n- 出售xxx / 出售xxx [数量]\n" +
 			"- 消除[绑定|宝藏]诅咒 / 消除[绑定|宝藏]诅咒 [数量]\n" +
 			"- 装备[xx竿|三叉戟|美西螈]\n" +
-			"- 附魔[诱钓|海之眷顾]\n" +
+			"- 附魔[诱钓|海之眷顾|耐久|经验修补]\n" +
 			"- 合成[xx竿|三叉戟]\n" +
 			"- 出售所有垃圾\n" +
 			"- 当前装备概率明细\n" +

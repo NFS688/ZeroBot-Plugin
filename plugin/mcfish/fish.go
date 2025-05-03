@@ -22,8 +22,8 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
 			return
 		}
-		if numberOfPole > 30 {
-			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于30支的玩家不允许钓鱼"))
+		if numberOfPole > 100 {
+			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于100支的玩家不允许钓鱼"))
 			return
 		}
 		fishNumber := 1
@@ -288,11 +288,11 @@ func init() {
 					typeOfThing = "fish"
 					picName = "海豚"
 					thingName = "海豚"
-				case dice >= 75 && dice < 85:
+				case dice probabilities["耐久"].Min && dice probabilities["耐久"].Max:
 					typeOfThing = "article"
 					picName = "book"
 					thingName = "耐久"
-				case dice >= 85 && dice < 90:
+				case dice >= probabilities["经验修补"].Min && dice < probabilities["经验修补"].Max:
 					typeOfThing = "article"
 					picName = "book"
 					thingName = "经验修补"
