@@ -128,6 +128,7 @@ func init() {
 		}
 		oldthing := article{}
 		if equipInfo != (equip{}) && equipInfo.Equip != "美西螈" {
+			// 更新格式为: 耐久/维修次数/诱钓等级/眷顾等级/耐久等级/经验修补等级
 			oldthing = article{
 				Duration: time.Now().Unix(),
 				Type:     "pole",
