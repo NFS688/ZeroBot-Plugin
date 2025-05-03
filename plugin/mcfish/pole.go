@@ -39,10 +39,10 @@ func init() {
 				induceLevel, _ := strconv.Atoi(poleInfo[2])
 				favorLevel, _ := strconv.Atoi(poleInfo[3])
 				durabilityLevel := 0
+				expRepairLevel := 0
 				if len(poleInfo) > 4 {
 					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
 				}
-				expRepairLevel := 0
 				if len(poleInfo) > 5 {
 					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 				}
@@ -71,7 +71,8 @@ func init() {
 			msg = append(msg, message.Reply(ctx.Event.MessageID), message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
+					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入对应序号进行装备\n"))
@@ -194,14 +195,6 @@ func init() {
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
-			durabilityLevel := 0
-			if len(poleInfo) > 4 {
-				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-			}
-			expRepairLevel := 0
-			if len(poleInfo) > 5 {
-				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-			}
 			poles = append(poles, equip{
 				ID:          uid,
 				Equip:       info.Name,
@@ -209,8 +202,6 @@ func init() {
 				Maintenance: maintenance,
 				Induce:      induceLevel,
 				Favor:       favorLevel,
-				Durability:  durabilityLevel,
-				ExpRepair:   expRepairLevel,
 			})
 		}
 		index := 0
@@ -220,7 +211,8 @@ func init() {
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
+					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n输入对应序号进行修复,或回复“取消”取消"))
 			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, msg...))
@@ -287,20 +279,6 @@ func init() {
 				equipInfo.Favor = 3
 			}
 			msg += ",海之眷顾等级提升至" + enchantLevel[equipInfo.Favor]
-		}
-		if newEquipInfo.Durability != 0 && rand.Intn(100) < 50 {
-			equipInfo.Durability += newEquipInfo.Durability
-			if equipInfo.Durability > 3 {
-				equipInfo.Durability = 3
-			}
-			msg += ",耐久等级提升至" + enchantLevel[equipInfo.Durability]
-		}
-		if newEquipInfo.ExpRepair != 0 && rand.Intn(100) < 50 {
-			equipInfo.ExpRepair += newEquipInfo.ExpRepair
-			if equipInfo.ExpRepair > 3 {
-				equipInfo.ExpRepair = 3
-			}
-			msg += ",经验修补等级提升至" + enchantLevel[equipInfo.ExpRepair]
 		}
 		thingInfo := articles[index]
 		thingInfo.Number = 0
@@ -373,7 +351,7 @@ func init() {
 				number = equipInfo.Durability
 			case "经验修补":
 				equipInfo.ExpRepair++
-				if equipInfo.ExpRepair > 3 {
+				if equipInfo.ExpRepair > 1 {
 					ctx.SendChain(message.Text("经验修补等级已达到上限，你浪费了一本附魔书"))
 					return
 				}
@@ -422,10 +400,10 @@ func init() {
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
 			durabilityLevel := 0
+			expRepairLevel := 0
 			if len(poleInfo) > 4 {
 				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
 			}
-			expRepairLevel := 0
 			if len(poleInfo) > 5 {
 				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 			}
@@ -447,7 +425,8 @@ func init() {
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
+					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入3个序号进行合成(用空格分割)\n"))
@@ -542,7 +521,11 @@ func init() {
 			)
 			return
 		}
-		attribute := strconv.Itoa(durationList[thingName]) + "/0/" + strconv.Itoa(induceLevel/upgradeNum) + "/" + strconv.Itoa(favorLevel/upgradeNum) + "/" + strconv.Itoa(durabilityLevel/upgradeNum) + "/" + strconv.Itoa(expRepairLevel/upgradeNum)
+		attribute := strconv.Itoa(durationList[thingName]) + "/0/" +
+			strconv.Itoa(induceLevel/upgradeNum) + "/" +
+			strconv.Itoa(favorLevel/upgradeNum) + "/" +
+			strconv.Itoa(durabilityLevel/upgradeNum) + "/" +
+			strconv.Itoa(expRepairLevel/upgradeNum)
 		newthing := article{
 			Duration: time.Now().Unix(),
 			Type:     "pole",

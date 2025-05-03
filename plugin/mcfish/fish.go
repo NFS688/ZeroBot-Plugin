@@ -2,7 +2,6 @@
 package mcfish
 
 import (
-	"math"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -115,27 +114,55 @@ func init() {
 		fishNumber = residue
 		msg := ""
 		if equipInfo.Equip != "美西螈" {
-			// 计算耐久消耗
-			durabilityLoss := 0
+			// 耐久附魔逻辑：根据等级计算是否消耗耐久
+			durabilityConsumption := fishNumber
 			for i := 0; i < fishNumber; i++ {
-				// 根据耐久附魔等级计算是否消耗耐久
-				// 每次钓鱼有(60 + 40/(等级+1))%的几率会消耗耐久值
-				durabilityChance := 60 + 40/(equipInfo.Durability+1)
-				if rand.Intn(100) < durabilityChance {
-					durabilityLoss++
+				// 计算概率：(60 + 40/(等级+1))%
+				if rand.Intn(100) < (60 + 40/(equipInfo.Durability+1)) {
+					durabilityConsumption--
 				}
 			}
-			equipInfo.Durable -= durabilityLoss
+
+			// 经验修补附魔逻辑：消耗金钱修复耐久
+			if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
+				// 计算需要修复的耐久值
+				repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
+				// 每点耐久消耗2金钱
+				repairCost := repairNeeded * 2
+				// 获取用户钱包余额
+				money := wallet.GetWalletOf(uid)
+				if money >= 2 { // 至少有2金钱才能修复
+					// 计算实际可以修复的耐久值
+					actualRepair := money / 2
+					if actualRepair > repairNeeded {
+						actualRepair = repairNeeded
+					}
+					// 扣除金钱
+					err = wallet.InsertWalletOf(uid, -actualRepair*2)
+					if err != nil {
+						ctx.SendChain(message.Text("[ERROR at fish.go.5.2]:", err))
+						return
+					}
+					// 增加耐久
+					equipInfo.Durable += actualRepair
+					msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
+				}
+			}
+
+			// 消耗耐久
+			equipInfo.Durable -= durabilityConsumption
 			err = dbdata.updateUserEquip(equipInfo)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5]:", err))
 				return
 			}
+
 			if equipInfo.Durable < 10 && equipInfo.Durable > 0 {
-				msg = "(你的鱼竿耐久仅剩" + strconv.Itoa(equipInfo.Durable) + ")"
+				msg += "(你的鱼竿耐久仅剩" + strconv.Itoa(equipInfo.Durable) + ")"
 			} else if equipInfo.Durable <= 0 {
-				msg = "(你的鱼竿已销毁)"
+				msg += "(你的鱼竿已销毁)"
 			}
+
 			if equipInfo.Equip == "三叉戟" {
 				fishNumber *= 3
 			}
@@ -263,15 +290,18 @@ func init() {
 					typeOfThing = "fish"
 					picName = "海豚"
 					thingName = "海豚"
+				case dice >= 75 && dice < 85:
+					typeOfThing = "article"
+					picName = "book"
+					thingName = "耐久"
+				case dice >= 85 && dice < 90:
+					typeOfThing = "article"
+					picName = "book"
+					thingName = "经验修补"
 				default:
 					typeOfThing = "article"
 					picName = "book"
-					// 经验修补附魔的获取概率为其他附魔的三分之一
-					if rand.Intn(100) < 25 { // 25% 概率获得经验修补附魔书
-						thingName = "经验修补"
-					} else {
-						thingName = "诱钓"
-					}
+					thingName = "诱钓"
 				}
 			case dice >= probabilities["pole"].Min && dice < probabilities["pole"].Max: // 宝藏
 				typeOfThing = "pole"
@@ -316,7 +346,7 @@ func init() {
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
 						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
-						strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2))
+						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(1))
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
@@ -355,33 +385,6 @@ func init() {
 		err = dbdata.updateCurseFor(uid, "fish", fishNumber)
 		if err != nil {
 			logrus.Warnln(err)
-		}
-
-		// 经验修补附魔逻辑
-		if equipInfo.ExpRepair > 0 && equipInfo.Equip != "美西螈" && equipInfo.Durable < durationList[equipInfo.Equip] {
-			// 计算需要修复的耐久
-			maxRepair := durationList[equipInfo.Equip] - equipInfo.Durable
-			// 获取用户钱包余额
-			balance := wallet.GetWalletOf(uid)
-			// 计算可以修复的耐久（每点耐久消耗2点余额）
-			repairAmount := int(math.Min(maxRepair, balance/2))
-
-			if repairAmount > 0 {
-				// 扣除余额
-				err = wallet.InsertWalletOf(uid, -int64(repairAmount*2))
-				if err != nil {
-					logrus.Warnln("[ERROR at fish.go.exp-repair]:", err)
-				} else {
-					// 增加耐久
-					equipInfo.Durable += repairAmount
-					err = dbdata.updateUserEquip(equipInfo)
-					if err != nil {
-						logrus.Warnln("[ERROR at fish.go.exp-repair]:", err)
-					} else {
-						msg += "(经验修补恢复了" + strconv.Itoa(repairAmount) + "点耐久，消耗" + strconv.Itoa(repairAmount*2) + wallet.GetWalletName() + ")"
-					}
-				}
-			}
 		}
 		if len(thingNameList) == 1 {
 			thingName := ""
