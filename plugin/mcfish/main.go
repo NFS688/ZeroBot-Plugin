@@ -350,14 +350,41 @@ func (sql *fishdb) setEquipFor(uid int64) (err error) {
 func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	sql.Lock()
 	defer sql.Unlock()
-	err = sql.db.Create("equips", &userInfo)
+
+	// 创建一个临时结构体，只包含数据库中存在的字段
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	var temp tempEquip
+	err = sql.db.Create("equips", &temp)
 	if err != nil {
 		return
 	}
 	if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
 		return
 	}
-	err = sql.db.Find("equips", &userInfo, "WHERE ID = ?", uid)
+	err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
+	if err != nil {
+		return
+	}
+
+	// 将临时结构体的值复制到返回的结构体中
+	userInfo.ID = temp.ID
+	userInfo.Equip = temp.Equip
+	userInfo.Durable = temp.Durable
+	userInfo.Maintenance = temp.Maintenance
+	userInfo.Induce = temp.Induce
+	userInfo.Favor = temp.Favor
+	// 新字段设置为默认值0
+	userInfo.Durability = 0
+	userInfo.ExpRepair = 0
+
 	return
 }
 
@@ -365,14 +392,35 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	sql.Lock()
 	defer sql.Unlock()
-	err = sql.db.Create("equips", &userInfo)
+
+	// 创建一个临时结构体，只包含数据库中存在的字段
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	// 将userInfo的值复制到临时结构体中
+	temp := tempEquip{
+		ID:          userInfo.ID,
+		Equip:       userInfo.Equip,
+		Durable:     userInfo.Durable,
+		Maintenance: userInfo.Maintenance,
+		Induce:      userInfo.Induce,
+		Favor:       userInfo.Favor,
+	}
+
+	err = sql.db.Create("equips", &temp)
 	if err != nil {
 		return
 	}
 	if userInfo.Durable == 0 {
 		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
-	return sql.db.Insert("equips", &userInfo)
+	return sql.db.Insert("equips", &temp)
 }
 
 func (sql *fishdb) pickFishFor(uid int64, number int) (fishNames map[string]int, err error) {
