@@ -127,8 +127,6 @@ func init() {
 			if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
 				// 计算需要修复的耐久值
 				repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
-				// 每点耐久消耗2金钱
-				repairCost := repairNeeded * 2
 				// 获取用户钱包余额
 				money := wallet.GetWalletOf(uid)
 				if money >= 2 { // 至少有2金钱才能修复
