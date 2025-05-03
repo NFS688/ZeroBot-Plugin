@@ -188,7 +188,7 @@ func init() {
 			"1.每日的商店价格是波动的!!如何最大化收益自己考虑一下喔\n" +
 			"2.装备信息:\n-> 木竿 : 耐久上限:30 均价:100 上钩概率:0.7%\n-> 铁竿 : 耐久上限:50 均价:300 上钩概率:0.2%\n-> 金竿 : 耐久上限:70 均价700 上钩概率:0.06%\n" +
 			"-> 钻石竿 : 耐久上限:100 均价1500 上钩概率:0.03%\n-> 下界合金竿 : 耐久上限:150 均价3100 上钩概率:0.01%\n-> 三叉戟 : 可使1次钓鱼视为3次钓鱼. 耐久上限:300 均价4000 只能合成、修复和交易\n" +
-			"3.附魔书信息:\n-> 诱钓 : 减少上钩时间. 均价:1000, 上钩概率:0.25%\n-> 海之眷顾 : 增加宝藏上钩概率. 均价:2500, 上钩概率:0.10%\n-> 耐久 : 总共三级，每次使用鱼竿有(60 + 40/(等级+1))%的几率会消耗耐久值. 均价:1000, 上钩概率:0.25%\n-> 经验修补 : 只有一级，使用鱼竿时消耗2点用户钱包金额对鱼竿进行修复直至耐久度达到鱼竿最大耐久度为止. 均价:2500, 上钩概率:0.025%\n" +
+			"3.附魔书信息:\n-> 诱钓 : 减少上钩时间. 均价:1000, 上钩概率:0.25%\n-> 海之眷顾 : 增加宝藏上钩概率. 均价:2500, 上钩概率:0.10%\n-> 耐久 : 使用鱼竿只有(60 + 40/(等级+1))%的几率会消耗耐久值. 均价:1000, 上钩概率:0.25%\n-> 经验修补 : 使用鱼竿时消耗2点钱包金额对鱼竿进行修复. 均价:2500, 上钩概率:0.025%\n" +
 			"4.稀有物品:\n-> 唱片 : 出售物品时使用该物品使价格翻倍. 均价:3000, 上钩概率:0.01%\n" +
 			"-> 美西螈 : 可装备,获得隐形[钓鱼佬]buff,并让钓到除鱼竿和美西螈外的物品数量变成5,无耐久上限.不可修复/附魔,每次钓鱼消耗3条鱼. 均价:3000, 上钩概率:0.01%\n" +
 			"-> 海豚 : 使空竿概率变成垃圾概率. 均价:1000, 上钩概率:0.19%\n" +
@@ -308,7 +308,7 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	}
 	_, textH := canvas.MeasureString("装备信息")
 
-	backDY := math.Max(int(10+titleH*2+(textH*2)*4+10), 300)
+	backDY := math.Max(int(10+titleH*2+(textH*2)*6+10), 400)
 
 	canvas = gg.NewContext(1000, backDY)
 	// 画底色
@@ -386,11 +386,21 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	canvas.SetColor(color.Black)
 	canvas.DrawStringAnchored(maintenance, textDx+textW+5+barW+5+valueW/2, textDy+textH/2, 0.5, 0.5)
 
-	textDy += textH * 3
-	canvas.DrawString(" 附魔: 诱钓"+enchantLevel[equipInfo.Induce]+"  海之眷顾"+enchantLevel[equipInfo.Favor], textDx, textDy)
+	textDy += textH * 2.5
+	// 使用更小的字体显示附魔信息
+	if err = canvas.ParseFontFace(fontdata, 40); err != nil {
+		return nil, err
+	}
+	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[equipInfo.Induce], textDx, textDy)
 
-	textDy += textH * 1.5
-	canvas.DrawString(" 附魔: 耐久"+enchantLevel[equipInfo.Durability]+"  经验修补"+enchantLevel[equipInfo.ExpRepair], textDx, textDy)
+	textDy += textH * 1
+	canvas.DrawString(" 附魔: 海之眷顾 "+enchantLevel[equipInfo.Favor], textDx, textDy)
+
+	textDy += textH * 1
+	canvas.DrawString(" 附魔: 耐久 "+enchantLevel[equipInfo.Durability], textDx, textDy)
+
+	textDy += textH * 1
+	canvas.DrawString(" 附魔: 经验修补 "+enchantLevel[equipInfo.ExpRepair], textDx, textDy)
 	return canvas.Image(), nil
 }
 
