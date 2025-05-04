@@ -33,12 +33,19 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 		// 耐久附魔逻辑：根据等级计算是否消耗耐久
 		durabilityConsumption := residue
 
+		// 确保耐久附魔等级在有效范围内
+		durabilityLevel := equipInfo.Durability
+		if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+			durabilityLevel = 0
+			newEquipInfo.Durability = 0
+		}
+
 		// 打印调试信息
-		logrus.Infof("耐久附魔等级: %d", equipInfo.Durability)
+		logrus.Infof("耐久附魔等级: %d", durabilityLevel)
 
 		for i := 0; i < residue; i++ {
 			// 计算概率：(60 + 40/(等级+1))%
-			probability := 60 + 40/(equipInfo.Durability+1)
+			probability := 60 + 40/(durabilityLevel+1)
 			roll := rand.Intn(100)
 			logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 
@@ -53,7 +60,14 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 		// 经验修补附魔逻辑：消耗金钱修复耐久
 		logrus.Infof("经验修补附魔等级: %d", equipInfo.ExpRepair)
 
-		if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
+		// 确保经验修补等级在有效范围内
+		expRepairLevel := equipInfo.ExpRepair
+		if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+			expRepairLevel = 0
+			newEquipInfo.ExpRepair = 0
+		}
+
+		if expRepairLevel > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
 			// 计算需要修复的耐久值
 			repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
 			logrus.Infof("需要修复的耐久值: %d", repairNeeded)
@@ -63,27 +77,28 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			logrus.Infof("用户钱包余额: %d", money)
 
 			if money >= 2 { // 至少有2金钱才能修复
-				// 计算实际可以修复的耐久值
-				actualRepair := money / 2
+				// 计算实际可以修复的耐久值 (根据经验修补等级增加修复效率)
+				repairRate := 1 + expRepairLevel // 经验修补I修复2点，II修复3点
+				actualRepair := (money / 2) * repairRate
 				if actualRepair > repairNeeded {
 					actualRepair = repairNeeded
 				}
 				logrus.Infof("实际修复的耐久值: %d", actualRepair)
 
 				// 扣除金钱
-				err = wallet.InsertWalletOf(uid, -actualRepair*2)
+				err = wallet.InsertWalletOf(uid, -actualRepair*2/repairRate)
 				if err != nil {
 					errMsg = "[ERROR at fish.go.5.2]:" + err.Error()
 					return
 				}
 				// 增加耐久
 				newEquipInfo.Durable += actualRepair
-				msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
+				msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2/repairRate) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
 			} else {
 				logrus.Infof("钱包余额不足，无法修复耐久")
 			}
 		} else {
-			if equipInfo.ExpRepair <= 0 {
+			if expRepairLevel <= 0 {
 				logrus.Infof("经验修补附魔等级为0，无法修复耐久")
 			}
 			if equipInfo.Durable >= durationList[equipInfo.Equip] {
@@ -103,6 +118,13 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			msg += "(你的鱼竿耐久仅剩" + strconv.Itoa(newEquipInfo.Durable) + ")"
 		} else if newEquipInfo.Durable <= 0 {
 			msg += "(你的鱼竿已销毁)"
+		}
+	} else {
+		// 美西螈不消耗耐久
+		err = dbdata.updateUserEquip(newEquipInfo)
+		if err != nil {
+			errMsg = "[ERROR at fish.go.5]:" + err.Error()
+			return
 		}
 	}
 

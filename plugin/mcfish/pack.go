@@ -384,16 +384,38 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	if err = canvas.ParseFontFace(fontdata, 40); err != nil {
 		return nil, err
 	}
-	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[equipInfo.Induce], textDx, textDy)
+
+	// 确保附魔等级在有效范围内
+	induceLevel := equipInfo.Induce
+	if induceLevel < 0 || induceLevel >= len(enchantLevel) {
+		induceLevel = 0
+	}
+
+	favorLevel := equipInfo.Favor
+	if favorLevel < 0 || favorLevel >= len(enchantLevel) {
+		favorLevel = 0
+	}
+
+	durabilityLevel := equipInfo.Durability
+	if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+		durabilityLevel = 0
+	}
+
+	expRepairLevel := equipInfo.ExpRepair
+	if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+		expRepairLevel = 0
+	}
+
+	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[induceLevel], textDx, textDy)
 
 	textDy += textH * 1
-	canvas.DrawString(" 附魔: 海之眷顾 "+enchantLevel[equipInfo.Favor], textDx, textDy)
+	canvas.DrawString(" 附魔: 海之眷顾 "+enchantLevel[favorLevel], textDx, textDy)
 
 	textDy += textH * 1
-	canvas.DrawString(" 附魔: 耐久 "+enchantLevel[equipInfo.Durability], textDx, textDy)
+	canvas.DrawString(" 附魔: 耐久 "+enchantLevel[durabilityLevel], textDx, textDy)
 
 	textDy += textH * 1
-	canvas.DrawString(" 附魔: 经验修补 "+enchantLevel[equipInfo.ExpRepair], textDx, textDy)
+	canvas.DrawString(" 附魔: 经验修补 "+enchantLevel[expRepairLevel], textDx, textDy)
 	return canvas.Image(), nil
 }
 

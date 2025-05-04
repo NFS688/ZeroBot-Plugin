@@ -70,9 +70,30 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Reply(ctx.Event.MessageID), message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
+				// 确保附魔等级在有效范围内
+				induceLevel := info.Induce
+				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
+					induceLevel = 0
+				}
+
+				favorLevel := info.Favor
+				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
+					favorLevel = 0
+				}
+
+				durabilityLevel := info.Durability
+				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+					durabilityLevel = 0
+				}
+
+				expRepairLevel := info.ExpRepair
+				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+					expRepairLevel = 0
+				}
+
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
-					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
+					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入对应序号进行装备\n"))
@@ -220,9 +241,30 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
+				// 确保附魔等级在有效范围内
+				induceLevel := info.Induce
+				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
+					induceLevel = 0
+				}
+
+				favorLevel := info.Favor
+				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
+					favorLevel = 0
+				}
+
+				durabilityLevel := info.Durability
+				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+					durabilityLevel = 0
+				}
+
+				expRepairLevel := info.ExpRepair
+				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+					expRepairLevel = 0
+				}
+
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
-					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
+					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n输入对应序号进行修复,或回复“取消”取消"))
 			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, msg...))
@@ -448,9 +490,30 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
+				// 确保附魔等级在有效范围内
+				induceLevel := info.Induce
+				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
+					induceLevel = 0
+				}
+
+				favorLevel := info.Favor
+				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
+					favorLevel = 0
+				}
+
+				durabilityLevel := info.Durability
+				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+					durabilityLevel = 0
+				}
+
+				expRepairLevel := info.ExpRepair
+				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+					expRepairLevel = 0
+				}
+
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor],
-					"/耐久", enchantLevel[info.Durability], "/经验修补", enchantLevel[info.ExpRepair], "\n"))
+					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
+					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入3个序号进行合成(用空格分割)\n"))
