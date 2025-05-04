@@ -601,16 +601,7 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	}
 
 	// 将userInfo的值复制到临时结构体中
-	temp := tempEquip{
-		ID:          userInfo.ID,
-		Equip:       userInfo.Equip,
-		Durable:     userInfo.Durable,
-		Maintenance: userInfo.Maintenance,
-		Induce:      userInfo.Induce,
-		Favor:       userInfo.Favor,
-		Durability:  userInfo.Durability,
-		ExpRepair:   userInfo.ExpRepair,
-	}
+	temp := tempEquip(userInfo)
 
 	err = sql.db.Create("equips", &temp)
 	if err != nil {

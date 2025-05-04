@@ -652,10 +652,10 @@ func init() {
 			return
 		}
 		// 计算平均附魔等级
-		finalInduceLevel := induceLevel/upgradeNum
-		finalFavorLevel := favorLevel/upgradeNum
-		finalDurabilityLevel := durabilityLevel/upgradeNum
-		finalExpRepairLevel := expRepairLevel/upgradeNum
+		finalInduceLevel := induceLevel / upgradeNum
+		finalFavorLevel := favorLevel / upgradeNum
+		finalDurabilityLevel := durabilityLevel / upgradeNum
+		finalExpRepairLevel := expRepairLevel / upgradeNum
 
 		// 确保附魔等级在有效范围内
 		if finalInduceLevel < 0 || finalInduceLevel >= len(enchantLevel) {
