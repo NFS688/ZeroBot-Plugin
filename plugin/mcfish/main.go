@@ -169,64 +169,67 @@ var (
 // 升级数据库表结构，添加新字段
 func upgradeEquipsTable(ctx *zero.Ctx) error {
 	// 检查equips表是否存在
-	var tableExists int
-	err := dbdata.db.DB.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='equips'").Scan(&tableExists)
-	if err != nil {
-		return err
-	}
-
-	if tableExists == 0 {
+	if !dbdata.db.CanFind("sqlite_master", "WHERE type='table' AND name='equips'") {
 		return nil // 表不存在，不需要升级
 	}
 
-	// 检查表结构
-	rows, err := dbdata.db.DB.Query("PRAGMA table_info(equips)")
+	// 创建一个临时结构体，用于检查表结构
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
+	}
+
+	// 尝试创建临时结构体
+	var temp tempEquip
+	err := dbdata.db.Create("equips", &temp)
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	// 计算列数
-	var columns []string
-	for rows.Next() {
-		var cid, notnull, pk int
-		var name, typ string
-		var dflt_value interface{}
-		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt_value, &pk); err != nil {
-			return err
-		}
-		columns = append(columns, name)
-	}
-
-	// 检查是否需要添加新列
-	hasDurability := false
-	hasExpRepair := false
-	for _, col := range columns {
-		if col == "Durability" {
-			hasDurability = true
-		}
-		if col == "ExpRepair" {
-			hasExpRepair = true
-		}
-	}
-
-	// 如果缺少任一列，则需要升级表结构
-	if !hasDurability || !hasExpRepair {
+		// 如果创建失败，可能是因为表结构不匹配
+		// 我们需要修改表结构
 		ctx.SendChain(message.Text("检测到mcfish插件数据库需要升级，正在升级..."))
 
-		// 添加缺失的列
-		if !hasDurability {
-			err = dbdata.db.DB.Exec("ALTER TABLE equips ADD COLUMN Durability INTEGER DEFAULT 0").Err()
-			if err != nil {
-				return err
-			}
+		// 创建一个新表，包含所有字段
+		err = dbdata.db.Exec(`
+			CREATE TABLE IF NOT EXISTS equips_new (
+				ID INTEGER,
+				Equip TEXT,
+				Durable INTEGER,
+				Maintenance INTEGER,
+				Induce INTEGER,
+				Favor INTEGER,
+				Durability INTEGER DEFAULT 0,
+				ExpRepair INTEGER DEFAULT 0,
+				PRIMARY KEY (ID)
+			)
+		`)
+		if err != nil {
+			return err
 		}
 
-		if !hasExpRepair {
-			err = dbdata.db.DB.Exec("ALTER TABLE equips ADD COLUMN ExpRepair INTEGER DEFAULT 0").Err()
-			if err != nil {
-				return err
-			}
+		// 迁移数据
+		err = dbdata.db.Exec(`
+			INSERT INTO equips_new (ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair)
+			SELECT ID, Equip, Durable, Maintenance, Induce, Favor, 0, 0 FROM equips
+		`)
+		if err != nil {
+			return err
+		}
+
+		// 删除旧表
+		err = dbdata.db.Exec("DROP TABLE equips")
+		if err != nil {
+			return err
+		}
+
+		// 重命名新表
+		err = dbdata.db.Exec("ALTER TABLE equips_new RENAME TO equips")
+		if err != nil {
+			return err
 		}
 
 		ctx.SendChain(message.Text("mcfish插件数据库升级完成！"))
