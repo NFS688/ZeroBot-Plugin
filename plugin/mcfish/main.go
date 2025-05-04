@@ -194,42 +194,54 @@ func upgradeEquipsTable(ctx *zero.Ctx) error {
 		ctx.SendChain(message.Text("检测到mcfish插件数据库需要升级，正在升级..."))
 
 		// 创建一个新表，包含所有字段
-		err = dbdata.db.Exec(`
-			CREATE TABLE IF NOT EXISTS equips_new (
-				ID INTEGER,
-				Equip TEXT,
-				Durable INTEGER,
-				Maintenance INTEGER,
-				Induce INTEGER,
-				Favor INTEGER,
-				Durability INTEGER DEFAULT 0,
-				ExpRepair INTEGER DEFAULT 0,
-				PRIMARY KEY (ID)
-			)
-		`)
-		if err != nil {
-			return err
+		type oldEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
 		}
 
-		// 迁移数据
-		err = dbdata.db.Exec(`
-			INSERT INTO equips_new (ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair)
-			SELECT ID, Equip, Durable, Maintenance, Induce, Favor, 0, 0 FROM equips
-		`)
+		// 获取旧表数据
+		var oldEquips []oldEquip
+		var oldEquipTemp oldEquip
+		err = dbdata.db.FindFor("equips", &oldEquipTemp, "", func() error {
+			oldEquips = append(oldEquips, oldEquipTemp)
+			return nil
+		})
 		if err != nil {
 			return err
 		}
 
 		// 删除旧表
-		err = dbdata.db.Exec("DROP TABLE equips")
+		err = dbdata.db.Drop("equips")
 		if err != nil {
 			return err
 		}
 
-		// 重命名新表
-		err = dbdata.db.Exec("ALTER TABLE equips_new RENAME TO equips")
+		// 创建新表
+		err = dbdata.db.Create("equips", &tempEquip)
 		if err != nil {
 			return err
+		}
+
+		// 迁移数据
+		for _, old := range oldEquips {
+			newEquip := tempEquip{
+				ID:          old.ID,
+				Equip:       old.Equip,
+				Durable:     old.Durable,
+				Maintenance: old.Maintenance,
+				Induce:      old.Induce,
+				Favor:       old.Favor,
+				Durability:  0,
+				ExpRepair:   0,
+			}
+			err = dbdata.db.Insert("equips", &newEquip)
+			if err != nil {
+				return err
+			}
 		}
 
 		ctx.SendChain(message.Text("mcfish插件数据库升级完成！"))
