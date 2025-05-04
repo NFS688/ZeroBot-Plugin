@@ -443,7 +443,75 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 创建一个临时结构体，包含所有字段
+	// 尝试使用旧结构体读取数据
+	type oldEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	var oldTemp oldEquip
+	err = sql.db.Create("equips", &oldTemp)
+	if err != nil {
+		return
+	}
+	if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
+		return
+	}
+
+	// 尝试使用旧结构体读取数据
+	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", uid)
+	if err == nil {
+		// 成功读取旧结构体数据
+		userInfo.ID = oldTemp.ID
+		userInfo.Equip = oldTemp.Equip
+		userInfo.Durable = oldTemp.Durable
+		userInfo.Maintenance = oldTemp.Maintenance
+		userInfo.Induce = oldTemp.Induce
+		userInfo.Favor = oldTemp.Favor
+		userInfo.Durability = 0
+		userInfo.ExpRepair = 0
+
+		// 升级数据库表结构
+		go func() {
+			// 创建一个新的临时结构体，包含所有字段
+			type tempEquip struct {
+				ID          int64
+				Equip       string
+				Durable     int
+				Maintenance int
+				Induce      int
+				Favor       int
+				Durability  int
+				ExpRepair   int
+			}
+
+			// 将旧数据复制到新结构体中
+			newTemp := tempEquip{
+				ID:          oldTemp.ID,
+				Equip:       oldTemp.Equip,
+				Durable:     oldTemp.Durable,
+				Maintenance: oldTemp.Maintenance,
+				Induce:      oldTemp.Induce,
+				Favor:       oldTemp.Favor,
+				Durability:  0,
+				ExpRepair:   0,
+			}
+
+			// 删除旧数据
+			_ = sql.db.Del("equips", "WHERE ID = ?", uid)
+
+			// 插入新数据
+			_ = sql.db.Insert("equips", &newTemp)
+		}()
+
+		return
+	}
+
+	// 如果使用旧结构体读取失败，尝试使用新结构体读取数据
 	type tempEquip struct {
 		ID          int64
 		Equip       string
@@ -486,7 +554,43 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 创建一个临时结构体，包含所有字段
+	// 尝试使用旧结构体检查表结构
+	type oldEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	var oldTemp oldEquip
+	err = sql.db.Create("equips", &oldTemp)
+	if err != nil {
+		return
+	}
+
+	// 尝试使用旧结构体读取数据
+	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", userInfo.ID)
+	if err == nil {
+		// 成功读取旧结构体数据，说明表结构是旧的
+		// 将userInfo的值复制到旧结构体中
+		oldTemp = oldEquip{
+			ID:          userInfo.ID,
+			Equip:       userInfo.Equip,
+			Durable:     userInfo.Durable,
+			Maintenance: userInfo.Maintenance,
+			Induce:      userInfo.Induce,
+			Favor:       userInfo.Favor,
+		}
+
+		if userInfo.Durable == 0 {
+			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+		}
+		return sql.db.Insert("equips", &oldTemp)
+	}
+
+	// 如果使用旧结构体读取失败，尝试使用新结构体
 	type tempEquip struct {
 		ID          int64
 		Equip       string
