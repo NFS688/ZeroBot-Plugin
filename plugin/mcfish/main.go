@@ -154,80 +154,9 @@ var (
 			ctx.SendChain(message.Text("[ERROR at main.go.1]:", err))
 			return false
 		}
-
-		// 检查并升级数据库表结构
-		err = upgradeEquipsTable(ctx)
-		if err != nil {
-			ctx.SendChain(message.Text("[ERROR at main.go.2]:", err))
-			return false
-		}
-
 		return true
 	})
 )
-
-// 升级数据库表结构，添加新字段
-func upgradeEquipsTable(ctx *zero.Ctx) error {
-	// 检查equips表是否存在
-	if !dbdata.db.CanFind("sqlite_master", "WHERE type='table' AND name='equips'") {
-		return nil // 表不存在，不需要升级
-	}
-
-	// 检查表结构
-	var columnCount int
-	err := dbdata.db.DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('equips')").Scan(&columnCount)
-	if err != nil {
-		return err
-	}
-
-	// 如果列数小于8，说明需要升级表结构
-	if columnCount < 8 {
-		ctx.SendChain(message.Text("检测到mcfish插件数据库需要升级，正在升级..."))
-
-		// 创建新表
-		err = dbdata.db.DB.Exec(`
-			CREATE TABLE IF NOT EXISTS equips_new (
-				ID INTEGER,
-				Equip TEXT,
-				Durable INTEGER,
-				Maintenance INTEGER,
-				Induce INTEGER,
-				Favor INTEGER,
-				Durability INTEGER DEFAULT 0,
-				ExpRepair INTEGER DEFAULT 0,
-				PRIMARY KEY (ID)
-			)
-		`).Err()
-		if err != nil {
-			return err
-		}
-
-		// 迁移数据
-		err = dbdata.db.DB.Exec(`
-			INSERT INTO equips_new (ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair)
-			SELECT ID, Equip, Durable, Maintenance, Induce, Favor, 0, 0 FROM equips
-		`).Err()
-		if err != nil {
-			return err
-		}
-
-		// 删除旧表
-		err = dbdata.db.DB.Exec("DROP TABLE equips").Err()
-		if err != nil {
-			return err
-		}
-
-		// 重命名新表
-		err = dbdata.db.DB.Exec("ALTER TABLE equips_new RENAME TO equips").Err()
-		if err != nil {
-			return err
-		}
-
-		ctx.SendChain(message.Text("mcfish插件数据库升级完成！"))
-	}
-
-	return nil
-}
 
 func init() {
 	// go func() {
@@ -422,84 +351,40 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 检查表结构
-	var columnCount int
-	err = sql.db.DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('equips')").Scan(&columnCount)
+	// 创建一个临时结构体，包含所有字段
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
+	}
+
+	var temp tempEquip
+	err = sql.db.Create("equips", &temp)
+	if err != nil {
+		return
+	}
+	if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
+		return
+	}
+	err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
 	if err != nil {
 		return
 	}
 
-	// 根据表结构选择不同的查询方式
-	if columnCount >= 8 {
-		// 新表结构，包含所有字段
-		type tempEquip struct {
-			ID          int64
-			Equip       string
-			Durable     int
-			Maintenance int
-			Induce      int
-			Favor       int
-			Durability  int
-			ExpRepair   int
-		}
-
-		var temp tempEquip
-		err = sql.db.Create("equips", &temp)
-		if err != nil {
-			return
-		}
-		if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
-			return
-		}
-		err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
-		if err != nil {
-			return
-		}
-
-		// 将临时结构体的值复制到返回的结构体中
-		userInfo.ID = temp.ID
-		userInfo.Equip = temp.Equip
-		userInfo.Durable = temp.Durable
-		userInfo.Maintenance = temp.Maintenance
-		userInfo.Induce = temp.Induce
-		userInfo.Favor = temp.Favor
-		userInfo.Durability = temp.Durability
-		userInfo.ExpRepair = temp.ExpRepair
-	} else {
-		// 旧表结构，只有6个字段
-		type tempEquip struct {
-			ID          int64
-			Equip       string
-			Durable     int
-			Maintenance int
-			Induce      int
-			Favor       int
-		}
-
-		var temp tempEquip
-		err = sql.db.Create("equips", &temp)
-		if err != nil {
-			return
-		}
-		if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
-			return
-		}
-		err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
-		if err != nil {
-			return
-		}
-
-		// 将临时结构体的值复制到返回的结构体中
-		userInfo.ID = temp.ID
-		userInfo.Equip = temp.Equip
-		userInfo.Durable = temp.Durable
-		userInfo.Maintenance = temp.Maintenance
-		userInfo.Induce = temp.Induce
-		userInfo.Favor = temp.Favor
-		// 新字段设置为默认值0
-		userInfo.Durability = 0
-		userInfo.ExpRepair = 0
-	}
+	// 将临时结构体的值复制到返回的结构体中
+	userInfo.ID = temp.ID
+	userInfo.Equip = temp.Equip
+	userInfo.Durable = temp.Durable
+	userInfo.Maintenance = temp.Maintenance
+	userInfo.Induce = temp.Induce
+	userInfo.Favor = temp.Favor
+	userInfo.Durability = temp.Durability
+	userInfo.ExpRepair = temp.ExpRepair
 
 	return
 }
@@ -509,77 +394,38 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 检查表结构
-	var columnCount int
-	err = sql.db.DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('equips')").Scan(&columnCount)
+	// 创建一个临时结构体，包含所有字段
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
+	}
+
+	// 将userInfo的值复制到临时结构体中
+	temp := tempEquip{
+		ID:          userInfo.ID,
+		Equip:       userInfo.Equip,
+		Durable:     userInfo.Durable,
+		Maintenance: userInfo.Maintenance,
+		Induce:      userInfo.Induce,
+		Favor:       userInfo.Favor,
+		Durability:  userInfo.Durability,
+		ExpRepair:   userInfo.ExpRepair,
+	}
+
+	err = sql.db.Create("equips", &temp)
 	if err != nil {
 		return
 	}
-
-	// 根据表结构选择不同的更新方式
-	if columnCount >= 8 {
-		// 新表结构，包含所有字段
-		type tempEquip struct {
-			ID          int64
-			Equip       string
-			Durable     int
-			Maintenance int
-			Induce      int
-			Favor       int
-			Durability  int
-			ExpRepair   int
-		}
-
-		// 将userInfo的值复制到临时结构体中
-		temp := tempEquip{
-			ID:          userInfo.ID,
-			Equip:       userInfo.Equip,
-			Durable:     userInfo.Durable,
-			Maintenance: userInfo.Maintenance,
-			Induce:      userInfo.Induce,
-			Favor:       userInfo.Favor,
-			Durability:  userInfo.Durability,
-			ExpRepair:   userInfo.ExpRepair,
-		}
-
-		err = sql.db.Create("equips", &temp)
-		if err != nil {
-			return
-		}
-		if userInfo.Durable == 0 {
-			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-		}
-		return sql.db.Insert("equips", &temp)
-	} else {
-		// 旧表结构，只有6个字段
-		type tempEquip struct {
-			ID          int64
-			Equip       string
-			Durable     int
-			Maintenance int
-			Induce      int
-			Favor       int
-		}
-
-		// 将userInfo的值复制到临时结构体中
-		temp := tempEquip{
-			ID:          userInfo.ID,
-			Equip:       userInfo.Equip,
-			Durable:     userInfo.Durable,
-			Maintenance: userInfo.Maintenance,
-			Induce:      userInfo.Induce,
-			Favor:       userInfo.Favor,
-		}
-
-		err = sql.db.Create("equips", &temp)
-		if err != nil {
-			return
-		}
-		if userInfo.Durable == 0 {
-			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-		}
-		return sql.db.Insert("equips", &temp)
+	if userInfo.Durable == 0 {
+		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
+	return sql.db.Insert("equips", &temp)
 }
 
 func (sql *fishdb) pickFishFor(uid int64, number int) (fishNames map[string]int, err error) {
