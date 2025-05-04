@@ -221,7 +221,7 @@ func upgradeEquipsTable(ctx *zero.Ctx) error {
 		}
 
 		// 创建新表
-		err = dbdata.db.Create("equips", &tempEquip)
+		err = dbdata.db.Create("equips", &tempEquip{})
 		if err != nil {
 			return err
 		}
