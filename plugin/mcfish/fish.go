@@ -14,6 +14,73 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
+// 处理钓鱼逻辑，减少锁的使用
+func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, newEquipInfo equip, errMsg, msg string) {
+	newEquipInfo = equipInfo
+
+	// 更新钓鱼次数
+	residue, err := dbdata.updateFishInfo(uid, fishNumber)
+	if err != nil {
+		errMsg = "[ERROR at fish.go.1]:" + err.Error()
+		return
+	}
+
+	if residue == 0 {
+		return
+	}
+
+	if equipInfo.Equip != "美西螈" {
+		// 耐久附魔逻辑：根据等级计算是否消耗耐久
+		durabilityConsumption := residue
+		for i := 0; i < residue; i++ {
+			// 计算概率：(60 + 40/(等级+1))%
+			if rand.Intn(100) < (60 + 40/(equipInfo.Durability+1)) {
+				durabilityConsumption--
+			}
+		}
+
+		// 经验修补附魔逻辑：消耗金钱修复耐久
+		if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
+			// 计算需要修复的耐久值
+			repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
+			// 获取用户钱包余额
+			money := wallet.GetWalletOf(uid)
+			if money >= 2 { // 至少有2金钱才能修复
+				// 计算实际可以修复的耐久值
+				actualRepair := money / 2
+				if actualRepair > repairNeeded {
+					actualRepair = repairNeeded
+				}
+				// 扣除金钱
+				err = wallet.InsertWalletOf(uid, -actualRepair*2)
+				if err != nil {
+					errMsg = "[ERROR at fish.go.5.2]:" + err.Error()
+					return
+				}
+				// 增加耐久
+				newEquipInfo.Durable += actualRepair
+				msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
+			}
+		}
+
+		// 消耗耐久
+		newEquipInfo.Durable -= durabilityConsumption
+		err = dbdata.updateUserEquip(newEquipInfo)
+		if err != nil {
+			errMsg = "[ERROR at fish.go.5]:" + err.Error()
+			return
+		}
+
+		if newEquipInfo.Durable < 10 && newEquipInfo.Durable > 0 {
+			msg += "(你的鱼竿耐久仅剩" + strconv.Itoa(newEquipInfo.Durable) + ")"
+		} else if newEquipInfo.Durable <= 0 {
+			msg += "(你的鱼竿已销毁)"
+		}
+	}
+
+	return
+}
+
 func init() {
 	engine.OnRegex(`^进行(([1-5]\d|[1-9])次)?钓鱼$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
@@ -102,9 +169,10 @@ func init() {
 		if equipInfo.Durable < fishNumber {
 			fishNumber = equipInfo.Durable
 		}
-		residue, err := dbdata.updateFishInfo(uid, fishNumber)
-		if err != nil {
-			ctx.SendChain(message.Text("[ERROR at fish.go.1]:", err))
+		// 使用一个函数来处理钓鱼逻辑，减少锁的使用
+		residue, newEquipInfo, errMsg, newMsg := processFishing(uid, fishNumber, equipInfo)
+		if errMsg != "" {
+			ctx.SendChain(message.Text(errMsg))
 			return
 		}
 		if residue == 0 {
@@ -112,59 +180,14 @@ func init() {
 			return
 		}
 		fishNumber = residue
-		msg := ""
-		if equipInfo.Equip != "美西螈" {
-			// 耐久附魔逻辑：根据等级计算是否消耗耐久
-			durabilityConsumption := fishNumber
-			for i := 0; i < fishNumber; i++ {
-				// 计算概率：(60 + 40/(等级+1))%
-				if rand.Intn(100) < (60 + 40/(equipInfo.Durability+1)) {
-					durabilityConsumption--
-				}
-			}
+		msg := newMsg
+		equipInfo = newEquipInfo
 
-			// 经验修补附魔逻辑：消耗金钱修复耐久
-			if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
-				// 计算需要修复的耐久值
-				repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
-				// 获取用户钱包余额
-				money := wallet.GetWalletOf(uid)
-				if money >= 2 { // 至少有2金钱才能修复
-					// 计算实际可以修复的耐久值
-					actualRepair := money / 2
-					if actualRepair > repairNeeded {
-						actualRepair = repairNeeded
-					}
-					// 扣除金钱
-					err = wallet.InsertWalletOf(uid, -actualRepair*2)
-					if err != nil {
-						ctx.SendChain(message.Text("[ERROR at fish.go.5.2]:", err))
-						return
-					}
-					// 增加耐久
-					equipInfo.Durable += actualRepair
-					msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
-				}
-			}
+		if equipInfo.Equip == "三叉戟" {
+			fishNumber *= 3
+		}
 
-			// 消耗耐久
-			equipInfo.Durable -= durabilityConsumption
-			err = dbdata.updateUserEquip(equipInfo)
-			if err != nil {
-				ctx.SendChain(message.Text("[ERROR at fish.go.5]:", err))
-				return
-			}
-
-			if equipInfo.Durable < 10 && equipInfo.Durable > 0 {
-				msg += "(你的鱼竿耐久仅剩" + strconv.Itoa(equipInfo.Durable) + ")"
-			} else if equipInfo.Durable <= 0 {
-				msg += "(你的鱼竿已销毁)"
-			}
-
-			if equipInfo.Equip == "三叉戟" {
-				fishNumber *= 3
-			}
-		} else {
+		if equipInfo.Equip == "美西螈" {
 			fishNames, err := dbdata.pickFishFor(uid, fishNumber*3)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5.1]:", err))

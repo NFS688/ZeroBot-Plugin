@@ -475,38 +475,36 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 		userInfo.Durability = 0
 		userInfo.ExpRepair = 0
 
-		// 升级数据库表结构
-		go func() {
-			// 创建一个新的临时结构体，包含所有字段
-			type tempEquip struct {
-				ID          int64
-				Equip       string
-				Durable     int
-				Maintenance int
-				Induce      int
-				Favor       int
-				Durability  int
-				ExpRepair   int
-			}
+		// 升级数据库表结构（不使用异步，避免数据库锁定问题）
+		// 创建一个新的临时结构体，包含所有字段
+		type tempEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
+			Durability  int
+			ExpRepair   int
+		}
 
-			// 将旧数据复制到新结构体中
-			newTemp := tempEquip{
-				ID:          oldTemp.ID,
-				Equip:       oldTemp.Equip,
-				Durable:     oldTemp.Durable,
-				Maintenance: oldTemp.Maintenance,
-				Induce:      oldTemp.Induce,
-				Favor:       oldTemp.Favor,
-				Durability:  0,
-				ExpRepair:   0,
-			}
+		// 将旧数据复制到新结构体中
+		newTemp := tempEquip{
+			ID:          oldTemp.ID,
+			Equip:       oldTemp.Equip,
+			Durable:     oldTemp.Durable,
+			Maintenance: oldTemp.Maintenance,
+			Induce:      oldTemp.Induce,
+			Favor:       oldTemp.Favor,
+			Durability:  0,
+			ExpRepair:   0,
+		}
 
-			// 删除旧数据
-			_ = sql.db.Del("equips", "WHERE ID = ?", uid)
+		// 删除旧数据
+		_ = sql.db.Del("equips", "WHERE ID = ?", uid)
 
-			// 插入新数据
-			_ = sql.db.Insert("equips", &newTemp)
-		}()
+		// 插入新数据
+		_ = sql.db.Insert("equips", &newTemp)
 
 		return
 	}
