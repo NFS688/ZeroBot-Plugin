@@ -32,25 +32,44 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 	if equipInfo.Equip != "美西螈" {
 		// 耐久附魔逻辑：根据等级计算是否消耗耐久
 		durabilityConsumption := residue
+
+		// 打印调试信息
+		logrus.Infof("耐久附魔等级: %d", equipInfo.Durability)
+
 		for i := 0; i < residue; i++ {
 			// 计算概率：(60 + 40/(等级+1))%
-			if rand.Intn(100) < (60 + 40/(equipInfo.Durability+1)) {
+			probability := 60 + 40/(equipInfo.Durability+1)
+			roll := rand.Intn(100)
+			logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
+
+			if roll < probability {
 				durabilityConsumption--
+				logrus.Infof("耐久检定成功，不消耗耐久")
+			} else {
+				logrus.Infof("耐久检定失败，消耗耐久")
 			}
 		}
 
 		// 经验修补附魔逻辑：消耗金钱修复耐久
+		logrus.Infof("经验修补附魔等级: %d", equipInfo.ExpRepair)
+
 		if equipInfo.ExpRepair > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
 			// 计算需要修复的耐久值
 			repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
+			logrus.Infof("需要修复的耐久值: %d", repairNeeded)
+
 			// 获取用户钱包余额
 			money := wallet.GetWalletOf(uid)
+			logrus.Infof("用户钱包余额: %d", money)
+
 			if money >= 2 { // 至少有2金钱才能修复
 				// 计算实际可以修复的耐久值
 				actualRepair := money / 2
 				if actualRepair > repairNeeded {
 					actualRepair = repairNeeded
 				}
+				logrus.Infof("实际修复的耐久值: %d", actualRepair)
+
 				// 扣除金钱
 				err = wallet.InsertWalletOf(uid, -actualRepair*2)
 				if err != nil {
@@ -60,6 +79,15 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 				// 增加耐久
 				newEquipInfo.Durable += actualRepair
 				msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
+			} else {
+				logrus.Infof("钱包余额不足，无法修复耐久")
+			}
+		} else {
+			if equipInfo.ExpRepair <= 0 {
+				logrus.Infof("经验修补附魔等级为0，无法修复耐久")
+			}
+			if equipInfo.Durable >= durationList[equipInfo.Equip] {
+				logrus.Infof("耐久已满，无需修复")
 			}
 		}
 
@@ -364,10 +392,17 @@ func init() {
 			if thingName != "" {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
+					// 随机生成鱼竿属性，包括耐久附魔和经验修补附魔
+					durabilityLevel := rand.Intn(3) // 0-2
+					expRepairLevel := rand.Intn(2)  // 0-1
+
+					// 打印调试信息
+					logrus.Infof("生成鱼竿: %s, 耐久附魔等级: %d, 经验修补附魔等级: %d", thingName, durabilityLevel, expRepairLevel)
+
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
 						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/0"
+						strconv.Itoa(durabilityLevel) + "/" + strconv.Itoa(expRepairLevel)
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
