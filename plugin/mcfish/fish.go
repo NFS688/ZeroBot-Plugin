@@ -43,17 +43,23 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 		// 打印调试信息
 		logrus.Infof("耐久附魔等级: %d", durabilityLevel)
 
-		for i := 0; i < residue; i++ {
-			// 计算概率：(60 + 40/(等级+1))%
-			probability := 60 + 40/(durabilityLevel+1)
-			roll := rand.Intn(100)
-			logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
+		// 如果没有耐久附魔，百分百消耗耐久
+		if durabilityLevel == 0 {
+			logrus.Infof("没有耐久附魔，百分百消耗耐久")
+		} else {
+			// 有耐久附魔，根据等级计算是否消耗耐久
+			for i := 0; i < residue; i++ {
+				// 计算概率：(60 + 40/(等级+1))%
+				probability := 60 + 40/(durabilityLevel+1)
+				roll := rand.Intn(100)
+				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 
-			if roll < probability {
-				durabilityConsumption--
-				logrus.Infof("耐久检定成功，不消耗耐久")
-			} else {
-				logrus.Infof("耐久检定失败，消耗耐久")
+				if roll < probability {
+					durabilityConsumption--
+					logrus.Infof("耐久检定成功，不消耗耐久")
+				} else {
+					logrus.Infof("耐久检定失败，消耗耐久")
+				}
 			}
 		}
 
@@ -418,13 +424,29 @@ func init() {
 					durabilityLevel := rand.Intn(3) // 0-2
 					expRepairLevel := rand.Intn(2)  // 0-1
 
+					// 确保附魔等级在有效范围内
+					if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+						durabilityLevel = 0
+					}
+					if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+						expRepairLevel = 0
+					}
+
 					// 打印调试信息
 					logrus.Infof("生成鱼竿: %s, 耐久附魔等级: %d, 经验修补附魔等级: %d", thingName, durabilityLevel, expRepairLevel)
 
-					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
-						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" +
+					// 确保属性字符串包含所有必要的字段
+					durable := rand.Intn(durationList[thingName]) + 1
+					maintenance := rand.Intn(10)
+					induce := rand.Intn(3)
+					favor := rand.Intn(2)
+
+					info := strconv.Itoa(durable) +
+						"/" + strconv.Itoa(maintenance) + "/" +
+						strconv.Itoa(induce) + "/" + strconv.Itoa(favor) + "/" +
 						strconv.Itoa(durabilityLevel) + "/" + strconv.Itoa(expRepairLevel)
+
+					logrus.Infof("生成的鱼竿属性字符串: %s", info)
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,

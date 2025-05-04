@@ -40,11 +40,18 @@ func init() {
 				favorLevel, _ := strconv.Atoi(poleInfo[3])
 				durabilityLevel := 0
 				expRepairLevel := 0
+
+				// 添加详细日志，查看解析过程
+				logrus.Infof("解析鱼竿属性，原始字符串: %s", info.Other)
+				logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+
 				if len(poleInfo) > 4 {
 					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+					logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
 				}
 				if len(poleInfo) > 5 {
 					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+					logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 				}
 				poles = append(poles, equip{
 					ID:          uid,
@@ -149,12 +156,33 @@ func init() {
 		}
 		oldthing := article{}
 		if equipInfo != (equip{}) && equipInfo.Equip != "美西螈" {
+			// 确保附魔等级在有效范围内
+			durabilityLevel := equipInfo.Durability
+			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+				durabilityLevel = 0
+			}
+
+			expRepairLevel := equipInfo.ExpRepair
+			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+				expRepairLevel = 0
+			}
+
+			// 构建属性字符串
+			attrStr := strconv.Itoa(equipInfo.Durable) + "/" +
+				strconv.Itoa(equipInfo.Maintenance) + "/" +
+				strconv.Itoa(equipInfo.Induce) + "/" +
+				strconv.Itoa(equipInfo.Favor) + "/" +
+				strconv.Itoa(durabilityLevel) + "/" +
+				strconv.Itoa(expRepairLevel)
+
+			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
+
 			oldthing = article{
 				Duration: time.Now().Unix(),
 				Type:     "pole",
 				Name:     equipInfo.Equip,
 				Number:   1,
-				Other:    strconv.Itoa(equipInfo.Durable) + "/" + strconv.Itoa(equipInfo.Maintenance) + "/" + strconv.Itoa(equipInfo.Induce) + "/" + strconv.Itoa(equipInfo.Favor) + "/" + strconv.Itoa(equipInfo.Durability) + "/" + strconv.Itoa(equipInfo.ExpRepair),
+				Other:    attrStr,
 			}
 		} else if equipInfo.Equip == "美西螈" {
 			articles, err = dbdata.getUserThingInfo(uid, "美西螈")
@@ -218,11 +246,18 @@ func init() {
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
 			durabilityLevel := 0
 			expRepairLevel := 0
+
+			// 添加详细日志，查看解析过程
+			logrus.Infof("修复鱼竿时解析属性，原始字符串: %s", info.Other)
+			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+
 			if len(poleInfo) > 4 {
 				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
 			}
 			if len(poleInfo) > 5 {
 				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 			}
 			poles = append(poles, equip{
 				ID:          uid,
@@ -467,11 +502,18 @@ func init() {
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
 			durabilityLevel := 0
 			expRepairLevel := 0
+
+			// 添加详细日志，查看解析过程
+			logrus.Infof("合成鱼竿时解析属性，原始字符串: %s", info.Other)
+			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+
 			if len(poleInfo) > 4 {
 				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
 			}
 			if len(poleInfo) > 5 {
 				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 			}
 			poles = append(poles, equip{
 				ID:          uid,
@@ -608,11 +650,34 @@ func init() {
 			)
 			return
 		}
+		// 计算平均附魔等级
+		finalInduceLevel := induceLevel/upgradeNum
+		finalFavorLevel := favorLevel/upgradeNum
+		finalDurabilityLevel := durabilityLevel/upgradeNum
+		finalExpRepairLevel := expRepairLevel/upgradeNum
+
+		// 确保附魔等级在有效范围内
+		if finalInduceLevel < 0 || finalInduceLevel >= len(enchantLevel) {
+			finalInduceLevel = 0
+		}
+		if finalFavorLevel < 0 || finalFavorLevel >= len(enchantLevel) {
+			finalFavorLevel = 0
+		}
+		if finalDurabilityLevel < 0 || finalDurabilityLevel >= len(enchantLevel) {
+			finalDurabilityLevel = 0
+		}
+		if finalExpRepairLevel < 0 || finalExpRepairLevel >= len(enchantLevel) {
+			finalExpRepairLevel = 0
+		}
+
+		// 构建属性字符串
 		attribute := strconv.Itoa(durationList[thingName]) + "/0/" +
-			strconv.Itoa(induceLevel/upgradeNum) + "/" +
-			strconv.Itoa(favorLevel/upgradeNum) + "/" +
-			strconv.Itoa(durabilityLevel/upgradeNum) + "/" +
-			strconv.Itoa(expRepairLevel/upgradeNum)
+			strconv.Itoa(finalInduceLevel) + "/" +
+			strconv.Itoa(finalFavorLevel) + "/" +
+			strconv.Itoa(finalDurabilityLevel) + "/" +
+			strconv.Itoa(finalExpRepairLevel)
+
+		logrus.Infof("合成鱼竿时存储属性，生成的属性字符串: %s", attribute)
 		newthing := article{
 			Duration: time.Now().Unix(),
 			Type:     "pole",
