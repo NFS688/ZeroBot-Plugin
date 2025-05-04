@@ -154,9 +154,86 @@ var (
 			ctx.SendChain(message.Text("[ERROR at main.go.1]:", err))
 			return false
 		}
+
+		// 检查并升级数据库表结构
+		err = upgradeEquipsTable(ctx)
+		if err != nil {
+			ctx.SendChain(message.Text("[ERROR at main.go.2]:", err))
+			return false
+		}
+
 		return true
 	})
 )
+
+// 升级数据库表结构，添加新字段
+func upgradeEquipsTable(ctx *zero.Ctx) error {
+	// 检查equips表是否存在
+	var tableExists int
+	err := dbdata.db.DB.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='equips'").Scan(&tableExists)
+	if err != nil {
+		return err
+	}
+
+	if tableExists == 0 {
+		return nil // 表不存在，不需要升级
+	}
+
+	// 检查表结构
+	rows, err := dbdata.db.DB.Query("PRAGMA table_info(equips)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	// 计算列数
+	var columns []string
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt_value interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt_value, &pk); err != nil {
+			return err
+		}
+		columns = append(columns, name)
+	}
+
+	// 检查是否需要添加新列
+	hasDurability := false
+	hasExpRepair := false
+	for _, col := range columns {
+		if col == "Durability" {
+			hasDurability = true
+		}
+		if col == "ExpRepair" {
+			hasExpRepair = true
+		}
+	}
+
+	// 如果缺少任一列，则需要升级表结构
+	if !hasDurability || !hasExpRepair {
+		ctx.SendChain(message.Text("检测到mcfish插件数据库需要升级，正在升级..."))
+
+		// 添加缺失的列
+		if !hasDurability {
+			err = dbdata.db.DB.Exec("ALTER TABLE equips ADD COLUMN Durability INTEGER DEFAULT 0").Err()
+			if err != nil {
+				return err
+			}
+		}
+
+		if !hasExpRepair {
+			err = dbdata.db.DB.Exec("ALTER TABLE equips ADD COLUMN ExpRepair INTEGER DEFAULT 0").Err()
+			if err != nil {
+				return err
+			}
+		}
+
+		ctx.SendChain(message.Text("mcfish插件数据库升级完成！"))
+	}
+
+	return nil
+}
 
 func init() {
 	// go func() {
