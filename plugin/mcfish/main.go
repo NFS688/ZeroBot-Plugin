@@ -456,7 +456,130 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 直接使用新结构体读取数据
+	// 尝试使用旧结构体读取数据
+	type oldEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	var oldTemp oldEquip
+	err = sql.db.Create("equips", &oldTemp)
+	if err != nil {
+		return
+	}
+	if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
+		return
+	}
+
+	// 尝试使用旧结构体读取数据
+	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", uid)
+	if err == nil {
+		// 成功读取旧结构体数据
+		userInfo.ID = oldTemp.ID
+		userInfo.Equip = oldTemp.Equip
+		userInfo.Durable = oldTemp.Durable
+		userInfo.Maintenance = oldTemp.Maintenance
+		userInfo.Induce = oldTemp.Induce
+		userInfo.Favor = oldTemp.Favor
+
+		// 检查是否有附魔信息
+		// 从背包中查找该装备的附魔信息
+		packName := strconv.FormatInt(uid, 10) + "Pack"
+		var packItem article
+		var durabilityLevel, expRepairLevel int
+
+		// 尝试从背包中找到对应的鱼竿
+		if sql.db.CanFind(packName, "WHERE Name = ? AND Type = 'pole'", oldTemp.Equip) {
+			var items []article
+			err := sql.db.FindFor(packName, &packItem, "WHERE Name = ? AND Type = 'pole'", func() error {
+				items = append(items, packItem)
+				return nil
+			}, oldTemp.Equip)
+
+			if err == nil && len(items) > 0 {
+				// 找到了背包中的鱼竿，尝试解析附魔信息
+				// 只使用第一个找到的鱼竿的附魔信息
+				if len(items) > 0 {
+					item := items[0]
+					poleInfo := strings.Split(item.Other, "/")
+
+					// 打印完整的属性数组，帮助调试
+					logrus.Infof("从背包解析属性，原始字符串: %s", item.Other)
+					logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+					for i, value := range poleInfo {
+						logrus.Infof("属性数组[%d] = %s", i, value)
+					}
+
+					// 确保属性字符串至少有4个字段
+					if len(poleInfo) < 4 {
+						// 如果字段不足，添加默认值
+						for len(poleInfo) < 4 {
+							poleInfo = append(poleInfo, "0")
+						}
+						logrus.Infof("属性字符串字段不足，已补充至4个字段")
+					}
+
+					// 确保属性字符串有6个字段（包括附魔信息）
+					if len(poleInfo) < 6 {
+						// 添加附魔字段
+						poleInfo = append(poleInfo, "0", "0")
+						logrus.Infof("属性字符串缺少附魔字段，已添加默认值")
+					}
+
+					// 从第5个字段解析耐久附魔等级
+					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+					// 从第6个字段解析经验修补附魔等级
+					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+
+					// 添加日志，记录解析的附魔等级
+					logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+					logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+				}
+			}
+		}
+
+		userInfo.Durability = durabilityLevel
+		userInfo.ExpRepair = expRepairLevel
+
+		// 升级数据库表结构（不使用异步，避免数据库锁定问题）
+		// 创建一个新的临时结构体，包含所有字段
+		type tempEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
+			Durability  int
+			ExpRepair   int
+		}
+
+		// 将旧数据复制到新结构体中，包括附魔信息
+		newTemp := tempEquip{
+			ID:          oldTemp.ID,
+			Equip:       oldTemp.Equip,
+			Durable:     oldTemp.Durable,
+			Maintenance: oldTemp.Maintenance,
+			Induce:      oldTemp.Induce,
+			Favor:       oldTemp.Favor,
+			Durability:  durabilityLevel,
+			ExpRepair:   expRepairLevel,
+		}
+
+		// 删除旧数据
+		_ = sql.db.Del("equips", "WHERE ID = ?", uid)
+
+		// 插入新数据
+		_ = sql.db.Insert("equips", &newTemp)
+
+		return
+	}
+
+	// 如果使用旧结构体读取失败，尝试使用新结构体读取数据
 	type tempEquip struct {
 		ID          int64
 		Equip       string
@@ -476,15 +599,12 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	if !sql.db.CanFind("equips", "WHERE ID = ?", uid) {
 		return
 	}
-
-	// 使用结构体查询
 	err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
 	if err != nil {
-		logrus.Errorf("查询装备信息失败: %v", err)
 		return
 	}
 
-	// 将查询结果复制到返回的结构体中
+	// 将临时结构体的值复制到返回的结构体中
 	userInfo.ID = temp.ID
 	userInfo.Equip = temp.Equip
 	userInfo.Durable = temp.Durable
@@ -499,19 +619,15 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 		userInfo.Durability = 0
 		// 更新数据库中的值
 		temp.Durability = 0
-		err = sql.db.Insert("equips", &temp)
-		if err != nil {
-			logrus.Errorf("更新耐久附魔等级失败: %v", err)
-		}
+		_ = sql.db.Del("equips", "WHERE ID = ?", uid)
+		_ = sql.db.Insert("equips", &temp)
 	}
 	if userInfo.ExpRepair < 0 || userInfo.ExpRepair >= len(enchantLevel) {
 		userInfo.ExpRepair = 0
 		// 更新数据库中的值
 		temp.ExpRepair = 0
-		err = sql.db.Insert("equips", &temp)
-		if err != nil {
-			logrus.Errorf("更新经验修补附魔等级失败: %v", err)
-		}
+		_ = sql.db.Del("equips", "WHERE ID = ?", uid)
+		_ = sql.db.Insert("equips", &temp)
 	}
 
 	// 添加日志，记录从数据库读取的附魔等级
@@ -551,7 +667,67 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 		return err
 	}
 
-	// 使用结构体进行操作
+	// 尝试使用旧结构体检查表结构
+	type oldEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+	}
+
+	var oldTemp oldEquip
+	err = sql.db.Create("equips", &oldTemp)
+	if err != nil {
+		return
+	}
+
+	// 尝试使用旧结构体读取数据
+	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", userInfo.ID)
+	if err == nil {
+		// 成功读取旧结构体数据，说明表结构是旧的
+		// 需要升级表结构
+
+		// 创建一个新的临时结构体，包含所有字段
+		type tempEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
+			Durability  int
+			ExpRepair   int
+		}
+
+		// 将userInfo的值复制到新结构体中
+		newTemp := tempEquip{
+			ID:          userInfo.ID,
+			Equip:       userInfo.Equip,
+			Durable:     userInfo.Durable,
+			Maintenance: userInfo.Maintenance,
+			Induce:      userInfo.Induce,
+			Favor:       userInfo.Favor,
+			Durability:  userInfo.Durability,
+			ExpRepair:   userInfo.ExpRepair,
+		}
+
+		// 删除旧数据
+		_ = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+
+		// 创建新表
+		_ = sql.db.Create("equips", &newTemp)
+
+		if userInfo.Durable == 0 {
+			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+		}
+
+		// 插入新数据
+		return sql.db.Insert("equips", &newTemp)
+	}
+
+	// 如果使用旧结构体读取失败，尝试使用新结构体
 	type tempEquip struct {
 		ID          int64
 		Equip       string
@@ -573,6 +749,14 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 		Favor:       userInfo.Favor,
 		Durability:  userInfo.Durability,
 		ExpRepair:   userInfo.ExpRepair,
+	}
+
+	err = sql.db.Create("equips", &temp)
+	if err != nil {
+		return
+	}
+	if userInfo.Durable == 0 {
+		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
 
 	// 检查是否存在该装备
