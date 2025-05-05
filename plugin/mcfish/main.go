@@ -16,6 +16,7 @@ import (
 	ctrl "github.com/FloatTech/zbpctrl"
 	"github.com/FloatTech/zbputils/control"
 	"github.com/FloatTech/zbputils/ctxext"
+	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
@@ -577,6 +578,9 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	userInfo.Durability = temp.Durability
 	userInfo.ExpRepair = temp.ExpRepair
 
+	// 添加日志，记录从数据库读取的附魔等级
+	logrus.Infof("从数据库读取的附魔等级 - 耐久附魔: %d, 经验修补: %d", temp.Durability, temp.ExpRepair)
+
 	return
 }
 
@@ -605,20 +609,44 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", userInfo.ID)
 	if err == nil {
 		// 成功读取旧结构体数据，说明表结构是旧的
-		// 将userInfo的值复制到旧结构体中
-		oldTemp = oldEquip{
+		// 需要升级表结构
+
+		// 创建一个新的临时结构体，包含所有字段
+		type tempEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
+			Durability  int
+			ExpRepair   int
+		}
+
+		// 将userInfo的值复制到新结构体中
+		newTemp := tempEquip{
 			ID:          userInfo.ID,
 			Equip:       userInfo.Equip,
 			Durable:     userInfo.Durable,
 			Maintenance: userInfo.Maintenance,
 			Induce:      userInfo.Induce,
 			Favor:       userInfo.Favor,
+			Durability:  userInfo.Durability,
+			ExpRepair:   userInfo.ExpRepair,
 		}
+
+		// 删除旧数据
+		_ = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+
+		// 创建新表
+		_ = sql.db.Create("equips", &newTemp)
 
 		if userInfo.Durable == 0 {
 			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 		}
-		return sql.db.Insert("equips", &oldTemp)
+
+		// 插入新数据
+		return sql.db.Insert("equips", &newTemp)
 	}
 
 	// 如果使用旧结构体读取失败，尝试使用新结构体

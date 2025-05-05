@@ -51,12 +51,15 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			// 有耐久附魔，根据等级计算是否消耗耐久
 			durabilityConsumption = 0 // 重置为0，然后累加实际消耗
 			for i := 0; i < residue; i++ {
-				// 计算概率：(60 + 40/(等级+1))%
-				probability := 60 + 40/(durabilityLevel+1)
+				// 计算概率：(80 - 20*等级)%
+				// 耐久I: 60% 消耗耐久
+				// 耐久II: 40% 消耗耐久
+				// 耐久III: 20% 消耗耐久
+				probability := 80 - 20*durabilityLevel
 				roll := rand.Intn(100)
 				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 
-				if roll >= probability { // 注意：这里是 >= 而不是 <
+				if roll < probability { // 小于概率值时消耗耐久
 					durabilityConsumption++
 					logrus.Infof("耐久检定失败，消耗耐久")
 				} else {

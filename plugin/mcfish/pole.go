@@ -206,8 +206,8 @@ func init() {
 				strconv.Itoa(equipInfo.Maintenance) + "/" +
 				strconv.Itoa(equipInfo.Induce) + "/" +
 				strconv.Itoa(equipInfo.Favor) + "/" +
-				strconv.Itoa(durabilityLevel) + "/" +
-				strconv.Itoa(expRepairLevel)
+				strconv.Itoa(equipInfo.Durability) + "/" +  // 使用装备的附魔等级，而不是局部变量
+				strconv.Itoa(equipInfo.ExpRepair)           // 使用装备的附魔等级，而不是局部变量
 
 			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
 
