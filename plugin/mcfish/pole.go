@@ -198,7 +198,9 @@ func init() {
 		}
 
 		// 更新背包中的鱼竿属性字符串，确保一致性
-		updatedAttrStr := strconv.Itoa(packEquip.Number) + "/" +
+		// 注意：这里不应该使用packEquip.Number，因为它是数量，而不是耐久度
+		// 应该使用poleInfo[0]，即原始的耐久度值
+		updatedAttrStr := poleInfo[0] + "/" +
 			poleInfo[1] + "/" +
 			poleInfo[2] + "/" +
 			poleInfo[3] + "/" +
@@ -279,16 +281,29 @@ func init() {
 		// 确保旧装备的附魔等级与当前装备一致
 		if oldthing.Other != "" {
 			poleInfo := strings.Split(oldthing.Other, "/")
-			if len(poleInfo) >= 6 {
+
+			// 确保属性字符串至少有4个字段
+			if len(poleInfo) < 4 {
+				// 如果字段不足，添加默认值
+				for len(poleInfo) < 4 {
+					poleInfo = append(poleInfo, "0")
+				}
+			}
+
+			// 确保属性字符串有6个字段（包括附魔信息）
+			if len(poleInfo) < 6 {
+				// 添加附魔字段
+				poleInfo = append(poleInfo, strconv.Itoa(durabilityLevel), strconv.Itoa(expRepairLevel))
+			} else {
 				// 更新附魔等级
 				poleInfo[4] = strconv.Itoa(durabilityLevel)
 				poleInfo[5] = strconv.Itoa(expRepairLevel)
-
-				// 重新构建属性字符串
-				oldthing.Other = strings.Join(poleInfo, "/")
-
-				logrus.Infof("更新旧装备的属性字符串: %s", oldthing.Other)
 			}
+
+			// 重新构建属性字符串
+			oldthing.Other = strings.Join(poleInfo, "/")
+
+			logrus.Infof("更新旧装备的属性字符串: %s", oldthing.Other)
 		}
 
 		err = dbdata.updateUserThingInfo(uid, oldthing)

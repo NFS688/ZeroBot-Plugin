@@ -583,6 +583,20 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	userInfo.Durability = temp.Durability
 	userInfo.ExpRepair = temp.ExpRepair
 
+	// 确保附魔等级在有效范围内
+	if userInfo.Durability < 0 || userInfo.Durability >= len(enchantLevel) {
+		userInfo.Durability = 0
+		// 更新数据库中的值
+		temp.Durability = 0
+		_ = sql.db.Insert("equips", &temp)
+	}
+	if userInfo.ExpRepair < 0 || userInfo.ExpRepair >= len(enchantLevel) {
+		userInfo.ExpRepair = 0
+		// 更新数据库中的值
+		temp.ExpRepair = 0
+		_ = sql.db.Insert("equips", &temp)
+	}
+
 	// 添加日志，记录从数据库读取的附魔等级
 	logrus.Infof("从数据库读取的附魔等级 - 耐久附魔: %d, 经验修补: %d", temp.Durability, temp.ExpRepair)
 
@@ -599,6 +613,14 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	sql.Lock()
 	defer sql.Unlock()
+
+	// 确保附魔等级在有效范围内
+	if userInfo.Durability < 0 || userInfo.Durability >= len(enchantLevel) {
+		userInfo.Durability = 0
+	}
+	if userInfo.ExpRepair < 0 || userInfo.ExpRepair >= len(enchantLevel) {
+		userInfo.ExpRepair = 0
+	}
 
 	// 添加日志，记录要保存的附魔等级
 	logrus.Infof("保存到数据库的附魔等级 - 耐久附魔: %d, 经验修补: %d", userInfo.Durability, userInfo.ExpRepair)
