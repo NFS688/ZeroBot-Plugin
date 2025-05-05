@@ -42,30 +42,30 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 
 		// 打印调试信息
 		logrus.Infof("耐久附魔等级: %d", durabilityLevel)
+		logrus.Infof("经验修补附魔等级: %d", equipInfo.ExpRepair)
 
 		// 如果没有耐久附魔，百分百消耗耐久
 		if durabilityLevel == 0 {
 			logrus.Infof("没有耐久附魔，百分百消耗耐久")
 		} else {
 			// 有耐久附魔，根据等级计算是否消耗耐久
+			durabilityConsumption = 0 // 重置为0，然后累加实际消耗
 			for i := 0; i < residue; i++ {
 				// 计算概率：(60 + 40/(等级+1))%
 				probability := 60 + 40/(durabilityLevel+1)
 				roll := rand.Intn(100)
 				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 
-				if roll < probability {
-					durabilityConsumption--
-					logrus.Infof("耐久检定成功，不消耗耐久")
-				} else {
+				if roll >= probability { // 注意：这里是 >= 而不是 <
+					durabilityConsumption++
 					logrus.Infof("耐久检定失败，消耗耐久")
+				} else {
+					logrus.Infof("耐久检定成功，不消耗耐久")
 				}
 			}
 		}
 
 		// 经验修补附魔逻辑：消耗金钱修复耐久
-		logrus.Infof("经验修补附魔等级: %d", equipInfo.ExpRepair)
-
 		// 确保经验修补等级在有效范围内
 		expRepairLevel := equipInfo.ExpRepair
 		if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
@@ -73,9 +73,13 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			newEquipInfo.ExpRepair = 0
 		}
 
-		if expRepairLevel > 0 && equipInfo.Durable < durationList[equipInfo.Equip] {
+		// 先消耗耐久
+		newEquipInfo.Durable -= durabilityConsumption
+
+		// 然后应用经验修补效果
+		if expRepairLevel > 0 && newEquipInfo.Durable < durationList[equipInfo.Equip] {
 			// 计算需要修复的耐久值
-			repairNeeded := durationList[equipInfo.Equip] - equipInfo.Durable
+			repairNeeded := durationList[equipInfo.Equip] - newEquipInfo.Durable
 			logrus.Infof("需要修复的耐久值: %d", repairNeeded)
 
 			// 获取用户钱包余额
@@ -84,7 +88,7 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 
 			if money >= 2 { // 至少有2金钱才能修复
 				// 计算实际可以修复的耐久值 (根据经验修补等级增加修复效率)
-				repairRate := 1 + expRepairLevel // 经验修补I修复2点，II修复3点
+				repairRate := 1 + expRepairLevel // 经验修补I修复2点
 				actualRepair := (money / 2) * repairRate
 				if actualRepair > repairNeeded {
 					actualRepair = repairNeeded
@@ -92,14 +96,15 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 				logrus.Infof("实际修复的耐久值: %d", actualRepair)
 
 				// 扣除金钱
-				err = wallet.InsertWalletOf(uid, -actualRepair*2/repairRate)
+				costMoney := actualRepair * 2 / repairRate
+				err = wallet.InsertWalletOf(uid, -costMoney)
 				if err != nil {
 					errMsg = "[ERROR at fish.go.5.2]:" + err.Error()
 					return
 				}
 				// 增加耐久
 				newEquipInfo.Durable += actualRepair
-				msg += "(经验修补：消耗" + strconv.Itoa(actualRepair*2/repairRate) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
+				msg += "(经验修补：消耗" + strconv.Itoa(costMoney) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
 			} else {
 				logrus.Infof("钱包余额不足，无法修复耐久")
 			}
@@ -107,13 +112,11 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			if expRepairLevel <= 0 {
 				logrus.Infof("经验修补附魔等级为0，无法修复耐久")
 			}
-			if equipInfo.Durable >= durationList[equipInfo.Equip] {
+			if newEquipInfo.Durable >= durationList[equipInfo.Equip] {
 				logrus.Infof("耐久已满，无需修复")
 			}
 		}
 
-		// 消耗耐久
-		newEquipInfo.Durable -= durabilityConsumption
 		err = dbdata.updateUserEquip(newEquipInfo)
 		if err != nil {
 			errMsg = "[ERROR at fish.go.5]:" + err.Error()
@@ -421,8 +424,26 @@ func init() {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
 					// 随机生成鱼竿属性，包括耐久附魔和经验修补附魔
-					durabilityLevel := rand.Intn(3) // 0-2
-					expRepairLevel := rand.Intn(2)  // 0-1
+					// 增加生成更高级附魔的概率
+					durabilityRoll := rand.Intn(100)
+					var durabilityLevel int
+					if durabilityRoll < 60 {
+						durabilityLevel = 0
+					} else if durabilityRoll < 85 {
+						durabilityLevel = 1
+					} else if durabilityRoll < 95 {
+						durabilityLevel = 2
+					} else {
+						durabilityLevel = 3
+					}
+
+					expRepairRoll := rand.Intn(100)
+					var expRepairLevel int
+					if expRepairRoll < 70 {
+						expRepairLevel = 0
+					} else {
+						expRepairLevel = 1
+					}
 
 					// 确保附魔等级在有效范围内
 					if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {

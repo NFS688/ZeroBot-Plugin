@@ -46,13 +46,30 @@ func init() {
 				logrus.Infof("解析鱼竿属性，原始字符串: %s", info.Other)
 				logrus.Infof("解析后的数组长度: %d", len(poleInfo))
 
+				// 确保属性字符串包含所有必要的字段
 				if len(poleInfo) > 4 {
 					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
 					logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+				} else {
+					logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
 				}
+
 				if len(poleInfo) > 5 {
 					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 					logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+				} else {
+					logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
+				}
+
+				// 确保附魔等级在有效范围内
+				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+					durabilityLevel = 0
+					logrus.Infof("耐久附魔等级超出范围，重置为0")
+				}
+
+				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+					expRepairLevel = 0
+					logrus.Infof("经验修补附魔等级超出范围，重置为0")
 				}
 				poles = append(poles, equip{
 					ID:          uid,
@@ -252,13 +269,30 @@ func init() {
 			logrus.Infof("修复鱼竿时解析属性，原始字符串: %s", info.Other)
 			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
 
+			// 确保属性字符串包含所有必要的字段
 			if len(poleInfo) > 4 {
 				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
 				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+			} else {
+				logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
 			}
+
 			if len(poleInfo) > 5 {
 				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+			} else {
+				logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
+			}
+
+			// 确保附魔等级在有效范围内
+			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+				durabilityLevel = 0
+				logrus.Infof("耐久附魔等级超出范围，重置为0")
+			}
+
+			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+				expRepairLevel = 0
+				logrus.Infof("经验修补附魔等级超出范围，重置为0")
 			}
 			poles = append(poles, equip{
 				ID:          uid,
@@ -452,11 +486,12 @@ func init() {
 				}
 				number = equipInfo.Durability
 			case "经验修补":
-				equipInfo.ExpRepair++
-				if equipInfo.ExpRepair > 1 {
+				// 经验修补只有一级
+				if equipInfo.ExpRepair >= 1 {
 					ctx.SendChain(message.Text("经验修补等级已达到上限，你浪费了一本附魔书"))
 					return
 				}
+				equipInfo.ExpRepair = 1
 				number = equipInfo.ExpRepair
 			default:
 				ctx.SendChain(message.Text("附魔失败了"))
@@ -508,13 +543,30 @@ func init() {
 			logrus.Infof("合成鱼竿时解析属性，原始字符串: %s", info.Other)
 			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
 
+			// 确保属性字符串包含所有必要的字段
 			if len(poleInfo) > 4 {
 				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
 				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+			} else {
+				logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
 			}
+
 			if len(poleInfo) > 5 {
 				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+			} else {
+				logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
+			}
+
+			// 确保附魔等级在有效范围内
+			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+				durabilityLevel = 0
+				logrus.Infof("耐久附魔等级超出范围，重置为0")
+			}
+
+			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+				expRepairLevel = 0
+				logrus.Infof("经验修补附魔等级超出范围，重置为0")
 			}
 			poles = append(poles, equip{
 				ID:          uid,
@@ -651,11 +703,16 @@ func init() {
 			)
 			return
 		}
-		// 计算平均附魔等级
-		finalInduceLevel := induceLevel/upgradeNum
-		finalFavorLevel := favorLevel/upgradeNum
-		finalDurabilityLevel := durabilityLevel/upgradeNum
-		finalExpRepairLevel := expRepairLevel/upgradeNum
+		// 计算平均附魔等级，向上取整以提高合成后的附魔等级
+		finalInduceLevel := (induceLevel + upgradeNum - 1) / upgradeNum
+		finalFavorLevel := (favorLevel + upgradeNum - 1) / upgradeNum
+		finalDurabilityLevel := (durabilityLevel + upgradeNum - 1) / upgradeNum
+
+		// 经验修补特殊处理：只要有一个鱼竿有经验修补，合成后就有经验修补
+		finalExpRepairLevel := 0
+		if expRepairLevel > 0 {
+			finalExpRepairLevel = 1
+		}
 
 		// 确保附魔等级在有效范围内
 		if finalInduceLevel < 0 || finalInduceLevel >= len(enchantLevel) {
