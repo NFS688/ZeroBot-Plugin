@@ -420,6 +420,16 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	// 添加日志，确认钓鱼背包显示的附魔等级
 	logrus.Infof("钓鱼背包显示的附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
 
+	// 检查装备信息是否与数据库中的一致，如果不一致则更新
+	if equipInfo.Durability != durabilityLevel || equipInfo.ExpRepair != expRepairLevel {
+		logrus.Infof("装备信息与数据库不一致，更新装备信息 - 原始值: 耐久附魔 %d, 经验修补 %d, 新值: 耐久附魔 %d, 经验修补 %d",
+			equipInfo.Durability, equipInfo.ExpRepair, durabilityLevel, expRepairLevel)
+
+		// 更新传入的装备信息
+		equipInfo.Durability = durabilityLevel
+		equipInfo.ExpRepair = expRepairLevel
+	}
+
 	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[induceLevel], textDx, textDy)
 
 	textDy += textH * 1

@@ -176,26 +176,45 @@ func init() {
 		durabilityLevel := 0
 		expRepairLevel := 0
 
-		if len(poleInfo) > 4 {
-			durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-			logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-			newEquipInfo.Durability = durabilityLevel
+		// 确保属性字符串至少有4个字段
+		if len(poleInfo) < 4 {
+			// 如果字段不足，添加默认值
+			for len(poleInfo) < 4 {
+				poleInfo = append(poleInfo, "0")
+			}
+			logrus.Infof("属性字符串字段不足，已补充至4个字段")
 		}
 
-		if len(poleInfo) > 5 {
-			expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-			logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-			newEquipInfo.ExpRepair = expRepairLevel
+		// 确保属性字符串有6个字段（包括附魔信息）
+		if len(poleInfo) < 6 {
+			// 添加附魔字段
+			poleInfo = append(poleInfo, "0", "0")
+			logrus.Infof("属性字符串缺少附魔字段，已添加默认值")
 		}
+
+		// 现在可以安全地读取附魔等级
+		durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+		logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+
+		expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+		logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 
 		// 确保附魔等级在有效范围内
-		if newEquipInfo.Durability < 0 || newEquipInfo.Durability >= len(enchantLevel) {
-			newEquipInfo.Durability = 0
+		if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
+			durabilityLevel = 0
+			logrus.Infof("耐久附魔等级超出范围，重置为0")
 		}
 
-		if newEquipInfo.ExpRepair < 0 || newEquipInfo.ExpRepair >= len(enchantLevel) {
-			newEquipInfo.ExpRepair = 0
+		if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
+			expRepairLevel = 0
+			logrus.Infof("经验修补附魔等级超出范围，重置为0")
 		}
+
+		// 更新装备信息
+		newEquipInfo.Durability = durabilityLevel
+		newEquipInfo.ExpRepair = expRepairLevel
+
+		logrus.Infof("设置装备的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
 
 		// 更新背包中的鱼竿属性字符串，确保一致性
 		// 注意：这里不应该使用packEquip.Number，因为它是数量，而不是耐久度
@@ -252,6 +271,7 @@ func init() {
 				strconv.Itoa(expRepairLevel)           // 使用当前装备的经验修补附魔等级
 
 			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
+			logrus.Infof("存储到背包的附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
 
 			oldthing = article{
 				Duration: time.Now().Unix(),
