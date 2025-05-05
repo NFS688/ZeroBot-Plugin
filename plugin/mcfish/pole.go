@@ -234,13 +234,13 @@ func init() {
 				expRepairLevel = 0
 			}
 
-			// 构建属性字符串，使用新装备的附魔等级
+			// 构建属性字符串，使用当前装备的附魔等级
 			attrStr := strconv.Itoa(equipInfo.Durable) + "/" +
 				strconv.Itoa(equipInfo.Maintenance) + "/" +
 				strconv.Itoa(equipInfo.Induce) + "/" +
 				strconv.Itoa(equipInfo.Favor) + "/" +
-				strconv.Itoa(newEquipInfo.Durability) + "/" +  // 使用新装备的耐久附魔等级
-				strconv.Itoa(newEquipInfo.ExpRepair)           // 使用新装备的经验修补附魔等级
+				strconv.Itoa(durabilityLevel) + "/" +  // 使用当前装备的耐久附魔等级
+				strconv.Itoa(expRepairLevel)           // 使用当前装备的经验修补附魔等级
 
 			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
 
