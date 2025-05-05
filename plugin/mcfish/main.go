@@ -732,20 +732,20 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 				logrus.Infof("附魔等级不一致，强制更新 - 期望值: 耐久附魔 %d, 经验修补 %d, 实际值: 耐久附魔 %d, 经验修补 %d",
 					userInfo.Durability, userInfo.ExpRepair, checkTemp.Durability, checkTemp.ExpRepair)
 
-				// 直接执行SQL更新语句
-				updateSQL := "UPDATE equips SET Durability = ?, ExpRepair = ? WHERE ID = ?"
-				_, execErr := sql.db.DB().Exec(updateSQL, userInfo.Durability, userInfo.ExpRepair, userInfo.ID)
-				if execErr != nil {
-					logrus.Errorf("强制更新附魔等级失败: %v", execErr)
+				// 使用删除后重新插入的方式更新数据
+				logrus.Infof("使用删除后重新插入的方式更新数据")
 
-					// 如果SQL更新失败，尝试删除后重新插入
-					logrus.Infof("尝试删除后重新插入")
+				// 删除旧数据
+				delErr := sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+				if delErr != nil {
+					logrus.Errorf("删除旧数据失败: %v", delErr)
+				}
 
-					// 删除旧数据
-					_ = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-
-					// 重新插入数据
-					return sql.db.Insert("equips", &temp)
+				// 重新插入数据
+				insertErr := sql.db.Insert("equips", &temp)
+				if insertErr != nil {
+					logrus.Errorf("重新插入数据失败: %v", insertErr)
+					return insertErr
 				} else {
 					logrus.Infof("强制更新附魔等级成功")
 				}
