@@ -875,7 +875,7 @@ func (sql *fishdb) migrateEquipTable() error {
 	sql.Lock()
 	defer sql.Unlock()
 
-	// 创建临时结构体来匹配旧的数据库结构
+	// 第一部分：迁移equips表
 	type oldEquip struct {
 		ID          int64  // 用户
 		Equip       string // 装备名称
@@ -898,7 +898,7 @@ func (sql *fishdb) migrateEquipTable() error {
 	}
 
 	// 删除旧表
-	err = sql.db.Drop("equips")
+	err = sql.db.Del("equips", "")
 	if err != nil {
 		return err
 	}
@@ -925,6 +925,58 @@ func (sql *fishdb) migrateEquipTable() error {
 		err = sql.db.Insert("equips", &newEquip)
 		if err != nil {
 			return err
+		}
+	}
+
+	// 第二部分：更新articles表中的other字段格式
+	// 获取所有鱼竿类型的物品
+	var articles []article
+	var tempArticle article
+
+	err = sql.db.FindFor("articles", &tempArticle, "WHERE Type = 'pole'", func() error {
+		articles = append(articles, tempArticle)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 更新每个鱼竿的other字段格式
+	for _, art := range articles {
+		parts := strings.Split(art.Other, "/")
+		if len(parts) < 6 { // 如果格式不完整
+			// 保留现有值
+			durable := "0"
+			maintenance := "0"
+			induce := "0"
+			favor := "0"
+
+			if len(parts) > 0 {
+				durable = parts[0]
+			}
+			if len(parts) > 1 {
+				maintenance = parts[1]
+			}
+			if len(parts) > 2 {
+				induce = parts[2]
+			}
+			if len(parts) > 3 {
+				favor = parts[3]
+			}
+
+			// 添加新字段
+			art.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+
+			// 使用删除再插入的方式更新记录
+			err = sql.db.Del("articles", "WHERE Duration = ? AND Name = ?", art.Duration, art.Name)
+			if err != nil {
+				return err
+			}
+
+			err = sql.db.Insert("articles", &art)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
