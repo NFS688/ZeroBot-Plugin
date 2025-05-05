@@ -229,6 +229,35 @@ func init() {
 		minMap[info.Type] += info.Probability
 	}
 	// }()
+
+	engine.OnFullMatch("钓鱼数据库迁移", zero.SuperUserPermission, getdb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+		ctx.SendChain(message.Text("⚠️ 警告：即将迁移钓鱼数据库结构，此操作不可逆。\n请回复「确认迁移」继续，或回复其他内容取消。"))
+
+		recv, cancel := zero.NewFutureEvent("message", 999, false,
+			zero.RegexRule(`^.*$`),
+			zero.CheckUser(ctx.Event.UserID)).Repeat()
+		defer cancel()
+
+		select {
+		case <-time.After(time.Second * 60):
+			ctx.SendChain(message.Text("迁移操作已超时取消"))
+			return
+		case e := <-recv:
+			if e.Event.Message.String() != "确认迁移" {
+				ctx.SendChain(message.Text("已取消迁移操作"))
+				return
+			}
+
+			ctx.SendChain(message.Text("开始迁移钓鱼数据库..."))
+			err := dbdata.migrateEquipTable()
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR] 迁移装备表失败:", err))
+				return
+			}
+
+			ctx.SendChain(message.Text("钓鱼数据库迁移完成！"))
+		}
+	})
 }
 
 // 更新上限信息
@@ -839,4 +868,65 @@ func checkIsWaste(thing string) bool {
 		}
 	}
 	return false
+}
+
+// 迁移装备数据库结构
+func (sql *fishdb) migrateEquipTable() error {
+	sql.Lock()
+	defer sql.Unlock()
+
+	// 创建临时结构体来匹配旧的数据库结构
+	type oldEquip struct {
+		ID          int64  // 用户
+		Equip       string // 装备名称
+		Durable     int    // 耐久
+		Maintenance int    // 维修次数
+		Induce      int    // 诱钓等级
+		Favor       int    // 眷顾等级
+	}
+
+	// 获取所有现有装备数据
+	var oldEquips []oldEquip
+	var tempEquip oldEquip
+
+	err := sql.db.FindFor("equips", &tempEquip, "", func() error {
+		oldEquips = append(oldEquips, tempEquip)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 删除旧表
+	err = sql.db.Drop("equips")
+	if err != nil {
+		return err
+	}
+
+	// 创建新表结构
+	err = sql.db.Create("equips", &equip{})
+	if err != nil {
+		return err
+	}
+
+	// 将旧数据迁移到新表，为新字段设置默认值
+	for _, old := range oldEquips {
+		newEquip := equip{
+			ID:          old.ID,
+			Equip:       old.Equip,
+			Durable:     old.Durable,
+			Maintenance: old.Maintenance,
+			Induce:      old.Induce,
+			Favor:       old.Favor,
+			Moredurable: 0, // 新字段默认值
+			Expfix:      0, // 新字段默认值
+		}
+
+		err = sql.db.Insert("equips", &newEquip)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
