@@ -187,37 +187,76 @@ func upgradeEquipsTable(ctx *zero.Ctx) error {
 	}
 
 	// 检查表结构是否需要升级
-	// 使用PRAGMA table_info查询表结构
-	var columnCount int
-	err := dbdata.db.DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('equips')").Scan(&columnCount)
-	if err != nil {
-		return err
+	// 创建一个临时结构体，用于检查表结构
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
 	}
 
-	// 如果列数小于8，说明需要升级表结构
-	if columnCount < 8 {
+	// 尝试创建临时结构体
+	var temp tempEquip
+	err := dbdata.db.Create("equips", &temp)
+	if err != nil {
+		// 如果创建失败，可能是因为表结构不匹配
+		// 我们需要修改表结构
 		ctx.SendChain(message.Text("检测到mcfish插件数据库需要升级，正在升级..."))
 
 		// 创建一个新表，包含所有字段
-		err = dbdata.db.Exec("CREATE TABLE equips_new (ID INTEGER, Equip TEXT, Durable INTEGER, Maintenance INTEGER, Induce INTEGER, Favor INTEGER, Durability INTEGER, ExpRepair INTEGER)")
-		if err != nil {
-			return err
+		type oldEquip struct {
+			ID          int64
+			Equip       string
+			Durable     int
+			Maintenance int
+			Induce      int
+			Favor       int
 		}
 
-		// 迁移数据
-		err = dbdata.db.Exec("INSERT INTO equips_new (ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair) SELECT ID, Equip, Durable, Maintenance, Induce, Favor, 0, 0 FROM equips")
+		// 获取旧表数据
+		var oldEquips []oldEquip
+		var oldEquipTemp oldEquip
+		err = dbdata.db.FindFor("equips", &oldEquipTemp, "", func() error {
+			oldEquips = append(oldEquips, oldEquipTemp)
+			return nil
+		})
 		if err != nil {
 			return err
 		}
 
 		// 删除旧表
-		err = dbdata.db.Exec("DROP TABLE equips")
+		err = dbdata.db.Drop("equips")
 		if err != nil {
 			return err
 		}
 
-		// 重命名新表
-		err = dbdata.db.Exec("ALTER TABLE equips_new RENAME TO equips")
+		// 创建新表
+		err = dbdata.db.Create("equips", &tempEquip{})
+		if err != nil {
+			return err
+		}
+
+		// 迁移数据
+		for _, old := range oldEquips {
+			newEquip := tempEquip{
+				ID:          old.ID,
+				Equip:       old.Equip,
+				Durable:     old.Durable,
+				Maintenance: old.Maintenance,
+				Induce:      old.Induce,
+				Favor:       old.Favor,
+				Durability:  0,
+				ExpRepair:   0,
+			}
+			err = dbdata.db.Insert("equips", &newEquip)
+			if err != nil {
+				return err
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -449,26 +488,34 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 		return
 	}
 
-	// 使用直接SQL查询避免结构体不匹配问题
-	var id int64
-	var equip string
-	var durable, maintenance, induce, favor, durability, expRepair int
+	// 使用结构体查询
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
+	}
 
-	err = sql.db.DB.QueryRow("SELECT ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair FROM equips WHERE ID = ?", uid).Scan(&id, &equip, &durable, &maintenance, &induce, &favor, &durability, &expRepair)
+	var temp tempEquip
+	err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
 	if err != nil {
 		logrus.Errorf("查询装备信息失败: %v", err)
 		return
 	}
 
 	// 将查询结果复制到返回的结构体中
-	userInfo.ID = id
-	userInfo.Equip = equip
-	userInfo.Durable = durable
-	userInfo.Maintenance = maintenance
-	userInfo.Induce = induce
-	userInfo.Favor = favor
-	userInfo.Durability = durability
-	userInfo.ExpRepair = expRepair
+	userInfo.ID = temp.ID
+	userInfo.Equip = temp.Equip
+	userInfo.Durable = temp.Durable
+	userInfo.Maintenance = temp.Maintenance
+	userInfo.Induce = temp.Induce
+	userInfo.Favor = temp.Favor
+	userInfo.Durability = temp.Durability
+	userInfo.ExpRepair = temp.ExpRepair
 
 	// 确保附魔等级在有效范围内
 	if userInfo.Durability < 0 || userInfo.Durability >= len(enchantLevel) {
@@ -518,77 +565,94 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 
 	// 如果耐久为0，删除装备
 	if userInfo.Durable == 0 {
-		_, err = sql.db.DB.Exec("DELETE FROM equips WHERE ID = ?", userInfo.ID)
+		err = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 		if err != nil {
 			logrus.Errorf("删除装备失败: %v", err)
 		}
 		return err
 	}
 
-	// 检查是否存在该装备
-	var count int
-	err = sql.db.DB.QueryRow("SELECT COUNT(*) FROM equips WHERE ID = ?", userInfo.ID).Scan(&count)
-	if err != nil {
-		logrus.Errorf("查询装备数量失败: %v", err)
-		return err
+	// 使用结构体进行操作
+	type tempEquip struct {
+		ID          int64
+		Equip       string
+		Durable     int
+		Maintenance int
+		Induce      int
+		Favor       int
+		Durability  int
+		ExpRepair   int
 	}
 
-	// 根据是否存在装备决定插入还是更新
-	if count > 0 {
-		// 更新现有装备
-		_, err = sql.db.DB.Exec("UPDATE equips SET Equip = ?, Durable = ?, Maintenance = ?, Induce = ?, Favor = ?, Durability = ?, ExpRepair = ? WHERE ID = ?",
-			userInfo.Equip, userInfo.Durable, userInfo.Maintenance, userInfo.Induce, userInfo.Favor, userInfo.Durability, userInfo.ExpRepair, userInfo.ID)
+	// 将userInfo的值复制到临时结构体中
+	temp := tempEquip{
+		ID:          userInfo.ID,
+		Equip:       userInfo.Equip,
+		Durable:     userInfo.Durable,
+		Maintenance: userInfo.Maintenance,
+		Induce:      userInfo.Induce,
+		Favor:       userInfo.Favor,
+		Durability:  userInfo.Durability,
+		ExpRepair:   userInfo.ExpRepair,
+	}
+
+	// 检查是否存在该装备
+	exists := sql.db.CanFind("equips", "WHERE ID = ?", userInfo.ID)
+
+	// 先删除旧数据，确保不会有冲突
+	if exists {
+		err = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 		if err != nil {
-			logrus.Errorf("更新装备失败: %v", err)
-			return err
+			logrus.Warnf("删除旧数据失败: %v", err)
+			// 继续执行，不要因为删除失败而中断
 		}
-	} else {
-		// 插入新装备
-		_, err = sql.db.DB.Exec("INSERT INTO equips (ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			userInfo.ID, userInfo.Equip, userInfo.Durable, userInfo.Maintenance, userInfo.Induce, userInfo.Favor, userInfo.Durability, userInfo.ExpRepair)
-		if err != nil {
-			logrus.Errorf("插入装备失败: %v", err)
-			return err
-		}
+	}
+
+	// 插入新数据
+	err = sql.db.Insert("equips", &temp)
+	if err != nil {
+		logrus.Errorf("插入数据失败: %v", err)
+		return err
 	}
 
 	// 验证数据是否正确保存
-	var id int64
-	var equip string
-	var durable, maintenance, induce, favor, durability, expRepair int
-
-	err = sql.db.DB.QueryRow("SELECT ID, Equip, Durable, Maintenance, Induce, Favor, Durability, ExpRepair FROM equips WHERE ID = ?", userInfo.ID).Scan(
-		&id, &equip, &durable, &maintenance, &induce, &favor, &durability, &expRepair)
+	var checkTemp tempEquip
+	err = sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
 	if err != nil {
-		logrus.Errorf("验证装备数据失败: %v", err)
+		logrus.Errorf("验证数据失败: %v", err)
 		return err
 	}
 
-	logrus.Infof("验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", durability, expRepair)
+	logrus.Infof("验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
 
 	// 如果附魔等级不一致，再次尝试更新
-	if durability != userInfo.Durability || expRepair != userInfo.ExpRepair {
+	if checkTemp.Durability != userInfo.Durability || checkTemp.ExpRepair != userInfo.ExpRepair {
 		logrus.Warnf("附魔等级不一致，再次尝试更新 - 期望值: 耐久附魔 %d, 经验修补 %d, 实际值: 耐久附魔 %d, 经验修补 %d",
-			userInfo.Durability, userInfo.ExpRepair, durability, expRepair)
+			userInfo.Durability, userInfo.ExpRepair, checkTemp.Durability, checkTemp.ExpRepair)
 
-		// 强制更新附魔等级
-		_, err = sql.db.DB.Exec("UPDATE equips SET Durability = ?, ExpRepair = ? WHERE ID = ?",
-			userInfo.Durability, userInfo.ExpRepair, userInfo.ID)
+		// 再次删除旧数据
+		err = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 		if err != nil {
-			logrus.Errorf("强制更新附魔等级失败: %v", err)
+			logrus.Errorf("再次删除旧数据失败: %v", err)
+		}
+
+		// 再次插入数据
+		err = sql.db.Insert("equips", &temp)
+		if err != nil {
+			logrus.Errorf("再次插入数据失败: %v", err)
 			return err
 		}
 
 		// 再次验证
-		err = sql.db.DB.QueryRow("SELECT Durability, ExpRepair FROM equips WHERE ID = ?", userInfo.ID).Scan(&durability, &expRepair)
+		err = sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
 		if err != nil {
-			logrus.Errorf("再次验证附魔等级失败: %v", err)
+			logrus.Errorf("再次验证数据失败: %v", err)
 			return err
 		}
 
-		logrus.Infof("再次验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", durability, expRepair)
+		logrus.Infof("再次验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
 
-		if durability != userInfo.Durability || expRepair != userInfo.ExpRepair {
+		if checkTemp.Durability != userInfo.Durability || checkTemp.ExpRepair != userInfo.ExpRepair {
 			logrus.Warnf("附魔等级仍然不一致，但继续执行")
 		} else {
 			logrus.Infof("附魔等级已正确保存")
