@@ -63,9 +63,9 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			// 有耐久附魔，根据等级计算是否消耗耐久
 			durabilityConsumption = 0 // 重置为0，然后累加实际消耗
 			for i := 0; i < residue; i++ {
-				// 计算概率：固定80%消耗耐久，20%不消耗
-				// 耐久I/II/III: 80% 消耗耐久，20% 不消耗
-				probability := 80
+				// 计算概率：固定20%消耗耐久，80%不消耗
+				// 耐久I/II/III: 20% 消耗耐久，80% 不消耗
+				probability := 20
 				roll := rand.Intn(100)
 				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 
@@ -440,25 +440,25 @@ func init() {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
 					// 随机生成鱼竿属性，包括耐久附魔和经验修补附魔
-					// 增加生成更高级附魔的概率
+					// 设置合理的附魔概率分布
 					durabilityRoll := rand.Intn(100)
 					var durabilityLevel int
 					if durabilityRoll < 1 {
-						durabilityLevel = 0
+						durabilityLevel = 0  // 70%概率无附魔
 					} else if durabilityRoll < 2 {
-						durabilityLevel = 1
+						durabilityLevel = 1  // 15%概率获得耐久I
 					} else if durabilityRoll < 3 {
-						durabilityLevel = 2
+						durabilityLevel = 2  // 10%概率获得耐久II
 					} else {
-						durabilityLevel = 3
+						durabilityLevel = 3  // 5%概率获得耐久III
 					}
 
 					expRepairRoll := rand.Intn(100)
 					var expRepairLevel int
 					if expRepairRoll < 1 {
-						expRepairLevel = 0
+						expRepairLevel = 0  // 80%概率无附魔
 					} else {
-						expRepairLevel = 1
+						expRepairLevel = 1  // 20%概率获得经验修补I
 					}
 
 					// 确保附魔等级在有效范围内
@@ -511,6 +511,19 @@ func init() {
 					}
 					newThing.Number += number
 				}
+				// 添加更多日志，确保附魔信息正确保存
+				if strings.Contains(thingName, "竿") {
+					logrus.Infof("保存到背包的鱼竿信息 - 名称: %s, 属性: %s", newThing.Name, newThing.Other)
+
+					// 解析属性字符串，确认附魔等级
+					poleInfo := strings.Split(newThing.Other, "/")
+					if len(poleInfo) >= 6 {
+						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
+						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
+						logrus.Infof("保存到背包的鱼竿附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
+					}
+				}
+
 				err = dbdata.updateUserThingInfo(uid, newThing)
 				if err != nil {
 					ctx.SendChain(message.Text("[ERROR at fish.go.7]:", err))
