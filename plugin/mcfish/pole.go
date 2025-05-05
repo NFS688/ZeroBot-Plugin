@@ -172,6 +172,11 @@ func init() {
 		logrus.Infof("装备鱼竿时解析属性，原始字符串: %s", packEquip.Other)
 		logrus.Infof("解析后的数组长度: %d", len(poleInfo))
 
+		// 打印完整的属性数组，帮助调试
+		for i, value := range poleInfo {
+			logrus.Infof("属性数组[%d] = %s", i, value)
+		}
+
 		// 确保属性字符串包含所有必要的字段
 		durabilityLevel := 0
 		expRepairLevel := 0

@@ -490,23 +490,42 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 
 			if err == nil && len(items) > 0 {
 				// 找到了背包中的鱼竿，尝试解析附魔信息
-				for _, item := range items {
+				// 只使用第一个找到的鱼竿的附魔信息
+				if len(items) > 0 {
+					item := items[0]
 					poleInfo := strings.Split(item.Other, "/")
-					// 确保属性字符串至少有6个字段
-					if len(poleInfo) >= 6 {
-						// 从第5个字段解析耐久附魔等级
-						durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-						// 从第6个字段解析经验修补附魔等级
-						expRepairLevel, _ = strconv.Atoi(poleInfo[5])
 
-						// 添加日志，记录解析的附魔等级
-						logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+					// 打印完整的属性数组，帮助调试
+					logrus.Infof("从背包解析属性，原始字符串: %s", item.Other)
+					logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+					for i, value := range poleInfo {
+						logrus.Infof("属性数组[%d] = %s", i, value)
 					}
-					// 找到一个有附魔的就跳出
-					if durabilityLevel > 0 || expRepairLevel > 0 {
-						break
+
+					// 确保属性字符串至少有4个字段
+					if len(poleInfo) < 4 {
+						// 如果字段不足，添加默认值
+						for len(poleInfo) < 4 {
+							poleInfo = append(poleInfo, "0")
+						}
+						logrus.Infof("属性字符串字段不足，已补充至4个字段")
 					}
+
+					// 确保属性字符串有6个字段（包括附魔信息）
+					if len(poleInfo) < 6 {
+						// 添加附魔字段
+						poleInfo = append(poleInfo, "0", "0")
+						logrus.Infof("属性字符串缺少附魔字段，已添加默认值")
+					}
+
+					// 从第5个字段解析耐久附魔等级
+					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+					// 从第6个字段解析经验修补附魔等级
+					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+
+					// 添加日志，记录解析的附魔等级
+					logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+					logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 				}
 			}
 		}
