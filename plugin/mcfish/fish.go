@@ -65,7 +65,7 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			for i := 0; i < residue; i++ {
 				// 计算概率：固定20%消耗耐久，80%不消耗
 				// 耐久I/II/III: 20% 消耗耐久，80% 不消耗
-				probability := 20
+				probability := 20 // 20%的概率消耗耐久
 				roll := rand.Intn(100)
 				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
 

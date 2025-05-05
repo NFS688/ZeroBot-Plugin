@@ -644,67 +644,7 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	// 添加日志，记录要保存的附魔等级
 	logrus.Infof("保存到数据库的附魔等级 - 耐久附魔: %d, 经验修补: %d", userInfo.Durability, userInfo.ExpRepair)
 
-	// 尝试使用旧结构体检查表结构
-	type oldEquip struct {
-		ID          int64
-		Equip       string
-		Durable     int
-		Maintenance int
-		Induce      int
-		Favor       int
-	}
-
-	var oldTemp oldEquip
-	err = sql.db.Create("equips", &oldTemp)
-	if err != nil {
-		return
-	}
-
-	// 尝试使用旧结构体读取数据
-	err = sql.db.Find("equips", &oldTemp, "WHERE ID = ?", userInfo.ID)
-	if err == nil {
-		// 成功读取旧结构体数据，说明表结构是旧的
-		// 需要升级表结构
-
-		// 创建一个新的临时结构体，包含所有字段
-		type tempEquip struct {
-			ID          int64
-			Equip       string
-			Durable     int
-			Maintenance int
-			Induce      int
-			Favor       int
-			Durability  int
-			ExpRepair   int
-		}
-
-		// 将userInfo的值复制到新结构体中
-		newTemp := tempEquip{
-			ID:          userInfo.ID,
-			Equip:       userInfo.Equip,
-			Durable:     userInfo.Durable,
-			Maintenance: userInfo.Maintenance,
-			Induce:      userInfo.Induce,
-			Favor:       userInfo.Favor,
-			Durability:  userInfo.Durability,
-			ExpRepair:   userInfo.ExpRepair,
-		}
-
-		// 删除旧数据
-		_ = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-
-		// 创建新表
-		_ = sql.db.Create("equips", &newTemp)
-
-		if userInfo.Durable == 0 {
-			return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-		}
-
-		// 插入新数据
-		return sql.db.Insert("equips", &newTemp)
-	}
-
-	// 如果使用旧结构体读取失败，尝试使用新结构体
+	// 使用新结构体
 	type tempEquip struct {
 		ID          int64
 		Equip       string
@@ -728,48 +668,73 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 		ExpRepair:   userInfo.ExpRepair,
 	}
 
+	// 确保表结构正确
 	err = sql.db.Create("equips", &temp)
 	if err != nil {
+		logrus.Errorf("创建表结构失败: %v", err)
 		return
 	}
+
+	// 如果耐久为0，删除装备
 	if userInfo.Durable == 0 {
 		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
 
-	// 插入数据
+	// 先删除旧数据，确保不会有冲突
+	delErr := sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+	if delErr != nil {
+		logrus.Warnf("删除旧数据失败: %v", delErr)
+		// 继续执行，不要因为删除失败而中断
+	}
+
+	// 插入新数据
 	err = sql.db.Insert("equips", &temp)
+	if err != nil {
+		logrus.Errorf("插入数据失败: %v", err)
+		return
+	}
 
-	// 如果成功插入，再次检查附魔等级是否正确保存
-	if err == nil {
-		var checkTemp tempEquip
-		checkErr := sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
+	// 验证数据是否正确保存
+	var checkTemp tempEquip
+	checkErr := sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
+	if checkErr != nil {
+		logrus.Errorf("验证数据失败: %v", checkErr)
+		return err
+	}
+
+	logrus.Infof("验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
+
+	// 如果附魔等级不一致，再次尝试更新
+	if checkTemp.Durability != userInfo.Durability || checkTemp.ExpRepair != userInfo.ExpRepair {
+		logrus.Warnf("附魔等级不一致，再次尝试更新 - 期望值: 耐久附魔 %d, 经验修补 %d, 实际值: 耐久附魔 %d, 经验修补 %d",
+			userInfo.Durability, userInfo.ExpRepair, checkTemp.Durability, checkTemp.ExpRepair)
+
+		// 再次删除旧数据
+		delErr = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+		if delErr != nil {
+			logrus.Errorf("再次删除旧数据失败: %v", delErr)
+		}
+
+		// 再次插入数据
+		err = sql.db.Insert("equips", &temp)
+		if err != nil {
+			logrus.Errorf("再次插入数据失败: %v", err)
+			return err
+		}
+
+		// 再次验证
+		checkErr = sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
 		if checkErr == nil {
-			logrus.Infof("检查保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
+			logrus.Infof("再次验证保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
 
-			// 如果附魔等级不一致，强制更新
 			if checkTemp.Durability != userInfo.Durability || checkTemp.ExpRepair != userInfo.ExpRepair {
-				logrus.Infof("附魔等级不一致，强制更新 - 期望值: 耐久附魔 %d, 经验修补 %d, 实际值: 耐久附魔 %d, 经验修补 %d",
-					userInfo.Durability, userInfo.ExpRepair, checkTemp.Durability, checkTemp.ExpRepair)
-
-				// 使用删除后重新插入的方式更新数据
-				logrus.Infof("使用删除后重新插入的方式更新数据")
-
-				// 删除旧数据
-				delErr := sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
-				if delErr != nil {
-					logrus.Errorf("删除旧数据失败: %v", delErr)
-				}
-
-				// 重新插入数据
-				insertErr := sql.db.Insert("equips", &temp)
-				if insertErr != nil {
-					logrus.Errorf("重新插入数据失败: %v", insertErr)
-					return insertErr
-				} else {
-					logrus.Infof("强制更新附魔等级成功")
-				}
+				logrus.Warnf("附魔等级仍然不一致，但继续执行")
+			} else {
+				logrus.Infof("附魔等级已正确保存")
 			}
 		}
+	} else {
+		logrus.Infof("附魔等级已正确保存")
 	}
 
 	return err

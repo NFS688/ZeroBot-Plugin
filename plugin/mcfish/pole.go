@@ -565,6 +565,10 @@ func init() {
 			ctx.SendChain(message.Text("你的背包不存在", book, "进行附魔"))
 			return
 		}
+
+		// 添加日志，记录附魔前的装备信息
+		logrus.Infof("附魔前的装备信息 - 耐久附魔: %d, 经验修补: %d", equipInfo.Durability, equipInfo.ExpRepair)
+
 		bookInfo := books[0]
 		bookInfo.Number--
 		err = dbdata.updateUserThingInfo(uid, bookInfo)
@@ -608,7 +612,36 @@ func init() {
 				ctx.SendChain(message.Text("附魔失败了"))
 				return
 			}
+
+			// 添加日志，记录附魔后的装备信息
+			logrus.Infof("附魔后的装备信息 - 耐久附魔: %d, 经验修补: %d", equipInfo.Durability, equipInfo.ExpRepair)
+
+			// 更新装备信息到数据库
 			err = dbdata.updateUserEquip(equipInfo)
+
+			// 添加日志，确认数据库更新后的装备信息
+			if err == nil {
+				// 从数据库重新读取装备信息，确保更新成功
+				updatedEquipInfo, checkErr := dbdata.getUserEquip(uid)
+				if checkErr == nil {
+					logrus.Infof("数据库更新后的装备信息 - 耐久附魔: %d, 经验修补: %d", updatedEquipInfo.Durability, updatedEquipInfo.ExpRepair)
+
+					// 如果数据库中的附魔等级与期望的不一致，尝试再次更新
+					if updatedEquipInfo.Durability != equipInfo.Durability || updatedEquipInfo.ExpRepair != equipInfo.ExpRepair {
+						logrus.Warnf("数据库中的附魔等级与期望的不一致，尝试再次更新")
+
+						// 强制更新装备信息
+						err = dbdata.updateUserEquip(equipInfo)
+						if err == nil {
+							// 再次检查更新是否成功
+							updatedEquipInfo, checkErr = dbdata.getUserEquip(uid)
+							if checkErr == nil {
+								logrus.Infof("再次更新后的装备信息 - 耐久附魔: %d, 经验修补: %d", updatedEquipInfo.Durability, updatedEquipInfo.ExpRepair)
+							}
+						}
+					}
+				}
+			}
 		}
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.9]:", err))
