@@ -492,11 +492,16 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 				// 找到了背包中的鱼竿，尝试解析附魔信息
 				for _, item := range items {
 					poleInfo := strings.Split(item.Other, "/")
-					if len(poleInfo) > 4 {
+					// 确保属性字符串至少有6个字段
+					if len(poleInfo) >= 6 {
+						// 从第5个字段解析耐久附魔等级
 						durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-					}
-					if len(poleInfo) > 5 {
+						// 从第6个字段解析经验修补附魔等级
 						expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+
+						// 添加日志，记录解析的附魔等级
+						logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 					}
 					// 找到一个有附魔的就跳出
 					if durabilityLevel > 0 || expRepairLevel > 0 {
@@ -603,17 +608,21 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 					poleInfo := strings.Split(item.Other, "/")
 					logrus.Infof("从背包解析鱼竿属性，原始字符串: %s", item.Other)
 
-					if len(poleInfo) > 4 {
+					// 确保属性字符串至少有6个字段
+					if len(poleInfo) >= 6 {
+						// 从第5个字段解析耐久附魔等级
 						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
+						// 从第6个字段解析经验修补附魔等级
+						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
+
+						// 添加日志，记录解析的附魔等级
 						logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+
+						// 更新最高附魔等级
 						if durabilityLevel > maxDurabilityLevel {
 							maxDurabilityLevel = durabilityLevel
 						}
-					}
-
-					if len(poleInfo) > 5 {
-						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
-						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
 						if expRepairLevel > maxExpRepairLevel {
 							maxExpRepairLevel = expRepairLevel
 						}
