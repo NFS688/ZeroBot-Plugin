@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/FloatTech/zbputils/ctxext"
-	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
@@ -39,38 +38,8 @@ func init() {
 				maintenance, _ := strconv.Atoi(poleInfo[1])
 				induceLevel, _ := strconv.Atoi(poleInfo[2])
 				favorLevel, _ := strconv.Atoi(poleInfo[3])
-				durabilityLevel := 0
-				expRepairLevel := 0
-
-				// 添加详细日志，查看解析过程
-				logrus.Infof("解析鱼竿属性，原始字符串: %s", info.Other)
-				logrus.Infof("解析后的数组长度: %d", len(poleInfo))
-
-				// 确保属性字符串包含所有必要的字段
-				if len(poleInfo) > 4 {
-					durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-					logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-				} else {
-					logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
-				}
-
-				if len(poleInfo) > 5 {
-					expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-					logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-				} else {
-					logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
-				}
-
-				// 确保附魔等级在有效范围内
-				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-					durabilityLevel = 0
-					logrus.Infof("耐久附魔等级超出范围，重置为0")
-				}
-
-				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-					expRepairLevel = 0
-					logrus.Infof("经验修补附魔等级超出范围，重置为0")
-				}
+				moredurableLevel, _ := strconv.Atoi(poleInfo[4])
+				expfixLevel, _ := strconv.Atoi(poleInfo[5])
 				poles = append(poles, equip{
 					ID:          uid,
 					Equip:       info.Name,
@@ -78,8 +47,8 @@ func init() {
 					Maintenance: maintenance,
 					Induce:      induceLevel,
 					Favor:       favorLevel,
-					Durability:  durabilityLevel,
-					ExpRepair:   expRepairLevel,
+					Moredurable: moredurableLevel,
+					Expfix:      expfixLevel,
 				})
 			}
 		} else {
@@ -95,30 +64,8 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Reply(ctx.Event.MessageID), message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
-				// 确保附魔等级在有效范围内
-				induceLevel := info.Induce
-				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
-					induceLevel = 0
-				}
-
-				favorLevel := info.Favor
-				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
-					favorLevel = 0
-				}
-
-				durabilityLevel := info.Durability
-				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-					durabilityLevel = 0
-				}
-
-				expRepairLevel := info.ExpRepair
-				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-					expRepairLevel = 0
-				}
-
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
-					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Moredurable], "/经验修补", enchantLevel[info.Expfix], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入对应序号进行装备\n"))
@@ -161,94 +108,12 @@ func init() {
 		}
 		newEquipInfo := poles[index]
 		packEquip := articles[index]
-
-		// 添加日志，确认装备前的附魔等级
-		logrus.Infof("装备前的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
-
-		// 解析背包中的鱼竿属性字符串，确保获取正确的附魔等级
-		poleInfo := strings.Split(packEquip.Other, "/")
-
-		// 添加详细日志，查看解析过程
-		logrus.Infof("装备鱼竿时解析属性，原始字符串: %s", packEquip.Other)
-		logrus.Infof("解析后的数组长度: %d", len(poleInfo))
-
-		// 打印完整的属性数组，帮助调试
-		for i, value := range poleInfo {
-			logrus.Infof("属性数组[%d] = %s", i, value)
-		}
-
-		// 确保属性字符串包含所有必要的字段
-		durabilityLevel := 0
-		expRepairLevel := 0
-
-		// 确保属性字符串至少有4个字段
-		if len(poleInfo) < 4 {
-			// 如果字段不足，添加默认值
-			for len(poleInfo) < 4 {
-				poleInfo = append(poleInfo, "0")
-			}
-			logrus.Infof("属性字符串字段不足，已补充至4个字段")
-		}
-
-		// 确保属性字符串有6个字段（包括附魔信息）
-		if len(poleInfo) < 6 {
-			// 添加附魔字段
-			poleInfo = append(poleInfo, "0", "0")
-			logrus.Infof("属性字符串缺少附魔字段，已添加默认值")
-		}
-
-		// 现在可以安全地读取附魔等级
-		durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-		logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-
-		expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-		logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-
-		// 确保附魔等级在有效范围内
-		if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-			durabilityLevel = 0
-			logrus.Infof("耐久附魔等级超出范围，重置为0")
-		}
-
-		if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-			expRepairLevel = 0
-			logrus.Infof("经验修补附魔等级超出范围，重置为0")
-		}
-
-		// 更新装备信息
-		newEquipInfo.Durability = durabilityLevel
-		newEquipInfo.ExpRepair = expRepairLevel
-
-		logrus.Infof("设置装备的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
-
-		// 更新背包中的鱼竿属性字符串，确保一致性
-		// 注意：这里不应该使用packEquip.Number，因为它是数量，而不是耐久度
-		// 应该使用poleInfo[0]，即原始的耐久度值
-		updatedAttrStr := poleInfo[0] + "/" +
-			poleInfo[1] + "/" +
-			poleInfo[2] + "/" +
-			poleInfo[3] + "/" +
-			strconv.Itoa(newEquipInfo.Durability) + "/" +
-			strconv.Itoa(newEquipInfo.ExpRepair)
-
-		if packEquip.Other != updatedAttrStr {
-			logrus.Infof("更新背包中的鱼竿属性字符串: %s -> %s", packEquip.Other, updatedAttrStr)
-			packEquip.Other = updatedAttrStr
-		}
-
-		// 添加日志，确认装备后的附魔等级
-		logrus.Infof("装备后的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
-
 		packEquip.Number--
 		err = dbdata.updateUserThingInfo(uid, packEquip)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.3]:", err))
 			return
 		}
-
-		// 添加日志，确认装备前的附魔等级
-		logrus.Infof("最终保存到数据库的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
-
 		err = dbdata.updateUserEquip(newEquipInfo)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.3.1]:", err))
@@ -256,34 +121,12 @@ func init() {
 		}
 		oldthing := article{}
 		if equipInfo != (equip{}) && equipInfo.Equip != "美西螈" {
-			// 确保附魔等级在有效范围内
-			durabilityLevel := equipInfo.Durability
-			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-				durabilityLevel = 0
-			}
-
-			expRepairLevel := equipInfo.ExpRepair
-			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-				expRepairLevel = 0
-			}
-
-			// 构建属性字符串，使用当前装备的附魔等级
-			attrStr := strconv.Itoa(equipInfo.Durable) + "/" +
-				strconv.Itoa(equipInfo.Maintenance) + "/" +
-				strconv.Itoa(equipInfo.Induce) + "/" +
-				strconv.Itoa(equipInfo.Favor) + "/" +
-				strconv.Itoa(durabilityLevel) + "/" +  // 使用当前装备的耐久附魔等级
-				strconv.Itoa(expRepairLevel)           // 使用当前装备的经验修补附魔等级
-
-			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
-			logrus.Infof("存储到背包的附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
-
 			oldthing = article{
 				Duration: time.Now().Unix(),
 				Type:     "pole",
 				Name:     equipInfo.Equip,
 				Number:   1,
-				Other:    attrStr,
+				Other:    strconv.Itoa(equipInfo.Durable) + "/" + strconv.Itoa(equipInfo.Maintenance) + "/" + strconv.Itoa(equipInfo.Induce) + "/" + strconv.Itoa(equipInfo.Favor) + "/" + strconv.Itoa(equipInfo.Moredurable) + "/" + strconv.Itoa(equipInfo.Expfix),
 			}
 		} else if equipInfo.Equip == "美西螈" {
 			articles, err = dbdata.getUserThingInfo(uid, "美西螈")
@@ -303,34 +146,6 @@ func init() {
 				oldthing.Number++
 			}
 		}
-		// 确保旧装备的附魔等级与当前装备一致
-		if oldthing.Other != "" {
-			poleInfo := strings.Split(oldthing.Other, "/")
-
-			// 确保属性字符串至少有4个字段
-			if len(poleInfo) < 4 {
-				// 如果字段不足，添加默认值
-				for len(poleInfo) < 4 {
-					poleInfo = append(poleInfo, "0")
-				}
-			}
-
-			// 确保属性字符串有6个字段（包括附魔信息）
-			if len(poleInfo) < 6 {
-				// 添加附魔字段
-				poleInfo = append(poleInfo, strconv.Itoa(durabilityLevel), strconv.Itoa(expRepairLevel))
-			} else {
-				// 更新附魔等级
-				poleInfo[4] = strconv.Itoa(durabilityLevel)
-				poleInfo[5] = strconv.Itoa(expRepairLevel)
-			}
-
-			// 重新构建属性字符串
-			oldthing.Other = strings.Join(poleInfo, "/")
-
-			logrus.Infof("更新旧装备的属性字符串: %s", oldthing.Other)
-		}
-
 		err = dbdata.updateUserThingInfo(uid, oldthing)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.4]:", err))
@@ -373,38 +188,8 @@ func init() {
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
-			durabilityLevel := 0
-			expRepairLevel := 0
-
-			// 添加详细日志，查看解析过程
-			logrus.Infof("修复鱼竿时解析属性，原始字符串: %s", info.Other)
-			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
-
-			// 确保属性字符串包含所有必要的字段
-			if len(poleInfo) > 4 {
-				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-			} else {
-				logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
-			}
-
-			if len(poleInfo) > 5 {
-				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-			} else {
-				logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
-			}
-
-			// 确保附魔等级在有效范围内
-			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-				durabilityLevel = 0
-				logrus.Infof("耐久附魔等级超出范围，重置为0")
-			}
-
-			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-				expRepairLevel = 0
-				logrus.Infof("经验修补附魔等级超出范围，重置为0")
-			}
+			moredurableLevel, _ := strconv.Atoi(poleInfo[4])
+			expfixLevel, _ := strconv.Atoi(poleInfo[5])
 			poles = append(poles, equip{
 				ID:          uid,
 				Equip:       info.Name,
@@ -412,8 +197,8 @@ func init() {
 				Maintenance: maintenance,
 				Induce:      induceLevel,
 				Favor:       favorLevel,
-				Durability:  durabilityLevel,
-				ExpRepair:   expRepairLevel,
+				Moredurable: moredurableLevel,
+				Expfix:      expfixLevel,
 			})
 		}
 		index := 0
@@ -422,30 +207,8 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
-				// 确保附魔等级在有效范围内
-				induceLevel := info.Induce
-				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
-					induceLevel = 0
-				}
-
-				favorLevel := info.Favor
-				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
-					favorLevel = 0
-				}
-
-				durabilityLevel := info.Durability
-				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-					durabilityLevel = 0
-				}
-
-				expRepairLevel := info.ExpRepair
-				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-					expRepairLevel = 0
-				}
-
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
-					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Moredurable], "/经验修补", enchantLevel[info.Expfix], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n输入对应序号进行修复,或回复“取消”取消"))
 			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, msg...))
@@ -513,19 +276,19 @@ func init() {
 			}
 			msg += ",海之眷顾等级提升至" + enchantLevel[equipInfo.Favor]
 		}
-		if newEquipInfo.Durability != 0 && rand.Intn(100) < 50 {
-			equipInfo.Durability += newEquipInfo.Durability
-			if equipInfo.Durability > 3 {
-				equipInfo.Durability = 3
+		if newEquipInfo.Moredurable != 0 && rand.Intn(100) < 50 {
+			equipInfo.Moredurable += newEquipInfo.Moredurable
+			if equipInfo.Moredurable > 3 {
+				equipInfo.Moredurable = 3
 			}
-			msg += ",耐久等级提升至" + enchantLevel[equipInfo.Durability]
+			msg += ",耐久等级提升至" + enchantLevel[equipInfo.Moredurable]
 		}
-		if newEquipInfo.ExpRepair != 0 && rand.Intn(100) < 50 {
-			equipInfo.ExpRepair += newEquipInfo.ExpRepair
-			if equipInfo.ExpRepair > 1 {
-				equipInfo.ExpRepair = 1
+		if newEquipInfo.Expfix != 0 && rand.Intn(100) < 50 {
+			equipInfo.Expfix += newEquipInfo.Expfix
+			if equipInfo.Expfix > 1 {
+				equipInfo.Expfix = 1
 			}
-			msg += ",经验修补等级提升至" + enchantLevel[equipInfo.ExpRepair]
+			msg += ",经验修补等级提升至" + enchantLevel[equipInfo.Expfix]
 		}
 		thingInfo := articles[index]
 		thingInfo.Number = 0
@@ -565,10 +328,6 @@ func init() {
 			ctx.SendChain(message.Text("你的背包不存在", book, "进行附魔"))
 			return
 		}
-
-		// 添加日志，记录附魔前的装备信息
-		logrus.Infof("附魔前的装备信息 - 耐久附魔: %d, 经验修补: %d", equipInfo.Durability, equipInfo.ExpRepair)
-
 		bookInfo := books[0]
 		bookInfo.Number--
 		err = dbdata.updateUserThingInfo(uid, bookInfo)
@@ -594,54 +353,24 @@ func init() {
 				}
 				number = equipInfo.Favor
 			case "耐久":
-				equipInfo.Durability++
-				if equipInfo.Durability > 3 {
+				equipInfo.Moredurable++
+				if equipInfo.Moredurable > 3 {
 					ctx.SendChain(message.Text("耐久等级已达到上限，你浪费了一本附魔书"))
 					return
 				}
-				number = equipInfo.Durability
+				number = equipInfo.Moredurable
 			case "经验修补":
-				// 经验修补只有一级
-				if equipInfo.ExpRepair >= 1 {
+				equipInfo.Expfix++
+				if equipInfo.Expfix > 1 {
 					ctx.SendChain(message.Text("经验修补等级已达到上限，你浪费了一本附魔书"))
 					return
 				}
-				equipInfo.ExpRepair = 1
-				number = equipInfo.ExpRepair
+				number = equipInfo.Expfix
 			default:
 				ctx.SendChain(message.Text("附魔失败了"))
 				return
 			}
-
-			// 添加日志，记录附魔后的装备信息
-			logrus.Infof("附魔后的装备信息 - 耐久附魔: %d, 经验修补: %d", equipInfo.Durability, equipInfo.ExpRepair)
-
-			// 更新装备信息到数据库
 			err = dbdata.updateUserEquip(equipInfo)
-
-			// 添加日志，确认数据库更新后的装备信息
-			if err == nil {
-				// 从数据库重新读取装备信息，确保更新成功
-				updatedEquipInfo, checkErr := dbdata.getUserEquip(uid)
-				if checkErr == nil {
-					logrus.Infof("数据库更新后的装备信息 - 耐久附魔: %d, 经验修补: %d", updatedEquipInfo.Durability, updatedEquipInfo.ExpRepair)
-
-					// 如果数据库中的附魔等级与期望的不一致，尝试再次更新
-					if updatedEquipInfo.Durability != equipInfo.Durability || updatedEquipInfo.ExpRepair != equipInfo.ExpRepair {
-						logrus.Warnf("数据库中的附魔等级与期望的不一致，尝试再次更新")
-
-						// 强制更新装备信息
-						err = dbdata.updateUserEquip(equipInfo)
-						if err == nil {
-							// 再次检查更新是否成功
-							updatedEquipInfo, checkErr = dbdata.getUserEquip(uid)
-							if checkErr == nil {
-								logrus.Infof("再次更新后的装备信息 - 耐久附魔: %d, 经验修补: %d", updatedEquipInfo.Durability, updatedEquipInfo.ExpRepair)
-							}
-						}
-					}
-				}
-			}
 		}
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.9]:", err))
@@ -680,38 +409,8 @@ func init() {
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
-			durabilityLevel := 0
-			expRepairLevel := 0
-
-			// 添加详细日志，查看解析过程
-			logrus.Infof("合成鱼竿时解析属性，原始字符串: %s", info.Other)
-			logrus.Infof("解析后的数组长度: %d", len(poleInfo))
-
-			// 确保属性字符串包含所有必要的字段
-			if len(poleInfo) > 4 {
-				durabilityLevel, _ = strconv.Atoi(poleInfo[4])
-				logrus.Infof("解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-			} else {
-				logrus.Infof("属性字符串中没有耐久附魔字段，设置为默认值0")
-			}
-
-			if len(poleInfo) > 5 {
-				expRepairLevel, _ = strconv.Atoi(poleInfo[5])
-				logrus.Infof("解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-			} else {
-				logrus.Infof("属性字符串中没有经验修补附魔字段，设置为默认值0")
-			}
-
-			// 确保附魔等级在有效范围内
-			if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-				durabilityLevel = 0
-				logrus.Infof("耐久附魔等级超出范围，重置为0")
-			}
-
-			if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-				expRepairLevel = 0
-				logrus.Infof("经验修补附魔等级超出范围，重置为0")
-			}
+			moredurableLevel, _ := strconv.Atoi(poleInfo[4])
+			expfixLevel, _ := strconv.Atoi(poleInfo[5])
 			poles = append(poles, equip{
 				ID:          uid,
 				Equip:       info.Name,
@@ -719,8 +418,8 @@ func init() {
 				Maintenance: maintenance,
 				Induce:      induceLevel,
 				Favor:       favorLevel,
-				Durability:  durabilityLevel,
-				ExpRepair:   expRepairLevel,
+				Moredurable: moredurableLevel,
+				Expfix:      expfixLevel,
 			})
 		}
 		list := []int{0, 1, 2}
@@ -729,30 +428,8 @@ func init() {
 			msg := make(message.Message, 0, 3+len(articles))
 			msg = append(msg, message.Text("找到以下鱼竿:\n"))
 			for i, info := range poles {
-				// 确保附魔等级在有效范围内
-				induceLevel := info.Induce
-				if induceLevel < 0 || induceLevel >= len(enchantLevel) {
-					induceLevel = 0
-				}
-
-				favorLevel := info.Favor
-				if favorLevel < 0 || favorLevel >= len(enchantLevel) {
-					favorLevel = 0
-				}
-
-				durabilityLevel := info.Durability
-				if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-					durabilityLevel = 0
-				}
-
-				expRepairLevel := info.ExpRepair
-				if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-					expRepairLevel = 0
-				}
-
 				msg = append(msg, message.Text("[", i, "] ", info.Equip, " : 耐", info.Durable, "/修", info.Maintenance,
-					"/诱", enchantLevel[induceLevel], "/眷顾", enchantLevel[favorLevel],
-					"/耐久", enchantLevel[durabilityLevel], "/经验修补", enchantLevel[expRepairLevel], "\n"))
+					"/诱", enchantLevel[info.Induce], "/眷顾", enchantLevel[info.Favor], "/耐久", enchantLevel[info.Moredurable], "/经验修补", enchantLevel[info.Expfix], "\n"))
 			}
 			msg = append(msg, message.Text("————————\n"))
 			msg = append(msg, message.Text("- 输入3个序号进行合成(用空格分割)\n"))
@@ -824,8 +501,8 @@ func init() {
 		upgradeNum := len(list)
 		favorLevel := 0
 		induceLevel := 0
-		durabilityLevel := 0
-		expRepairLevel := 0
+		moredurableLevel := 0
+		expfixLevel := 0
 		for _, index := range list {
 			thingInfo := articles[index]
 			thingInfo.Number = 0
@@ -836,8 +513,8 @@ func init() {
 			}
 			favorLevel += poles[index].Favor
 			induceLevel += poles[index].Induce
-			durabilityLevel += poles[index].Durability
-			expRepairLevel += poles[index].ExpRepair
+			moredurableLevel += poles[index].Moredurable
+			expfixLevel += poles[index].Expfix
 		}
 		if rand.Intn(100) >= 90 {
 			ctx.Send(
@@ -847,39 +524,7 @@ func init() {
 			)
 			return
 		}
-		// 计算平均附魔等级，向上取整以提高合成后的附魔等级
-		finalInduceLevel := (induceLevel + upgradeNum - 1) / upgradeNum
-		finalFavorLevel := (favorLevel + upgradeNum - 1) / upgradeNum
-		finalDurabilityLevel := (durabilityLevel + upgradeNum - 1) / upgradeNum
-
-		// 经验修补特殊处理：只要有一个鱼竿有经验修补，合成后就有经验修补
-		finalExpRepairLevel := 0
-		if expRepairLevel > 0 {
-			finalExpRepairLevel = 1
-		}
-
-		// 确保附魔等级在有效范围内
-		if finalInduceLevel < 0 || finalInduceLevel >= len(enchantLevel) {
-			finalInduceLevel = 0
-		}
-		if finalFavorLevel < 0 || finalFavorLevel >= len(enchantLevel) {
-			finalFavorLevel = 0
-		}
-		if finalDurabilityLevel < 0 || finalDurabilityLevel >= len(enchantLevel) {
-			finalDurabilityLevel = 0
-		}
-		if finalExpRepairLevel < 0 || finalExpRepairLevel >= len(enchantLevel) {
-			finalExpRepairLevel = 0
-		}
-
-		// 构建属性字符串
-		attribute := strconv.Itoa(durationList[thingName]) + "/0/" +
-			strconv.Itoa(finalInduceLevel) + "/" +
-			strconv.Itoa(finalFavorLevel) + "/" +
-			strconv.Itoa(finalDurabilityLevel) + "/" +
-			strconv.Itoa(finalExpRepairLevel)
-
-		logrus.Infof("合成鱼竿时存储属性，生成的属性字符串: %s", attribute)
+		attribute := strconv.Itoa(durationList[thingName]) + "/0/" + strconv.Itoa(induceLevel/upgradeNum) + "/" + strconv.Itoa(favorLevel/upgradeNum) + "/" + strconv.Itoa(moredurableLevel/upgradeNum) + "/" + strconv.Itoa(expfixLevel/upgradeNum)
 		newthing := article{
 			Duration: time.Now().Unix(),
 			Type:     "pole",

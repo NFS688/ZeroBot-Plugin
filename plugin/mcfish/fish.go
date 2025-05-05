@@ -14,148 +14,6 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
-// 处理钓鱼逻辑，减少锁的使用
-func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, newEquipInfo equip, errMsg, msg string) {
-	newEquipInfo = equipInfo
-
-	// 更新钓鱼次数
-	residue, err := dbdata.updateFishInfo(uid, fishNumber)
-	if err != nil {
-		errMsg = "[ERROR at fish.go.1]:" + err.Error()
-		return
-	}
-
-	if residue == 0 {
-		return
-	}
-
-	if equipInfo.Equip != "美西螈" {
-		// 耐久附魔逻辑：根据等级计算是否消耗耐久
-		durabilityConsumption := residue
-
-		// 从数据库重新读取装备信息，确保获取最新的附魔等级
-		freshEquipInfo, err := dbdata.getUserEquip(uid)
-		if err != nil {
-			logrus.Errorf("获取装备信息失败: %v", err)
-			// 如果获取失败，使用传入的装备信息
-			freshEquipInfo = equipInfo
-		} else {
-			// 更新装备信息
-			equipInfo = freshEquipInfo
-			newEquipInfo = freshEquipInfo
-		}
-
-		// 确保耐久附魔等级在有效范围内
-		durabilityLevel := equipInfo.Durability
-		if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-			durabilityLevel = 0
-			newEquipInfo.Durability = 0
-		}
-
-		// 打印调试信息
-		logrus.Infof("耐久附魔等级: %d", durabilityLevel)
-		logrus.Infof("经验修补附魔等级: %d", equipInfo.ExpRepair)
-
-		// 如果没有耐久附魔，百分百消耗耐久
-		if durabilityLevel == 0 {
-			logrus.Infof("没有耐久附魔，百分百消耗耐久")
-		} else {
-			// 有耐久附魔，根据等级计算是否消耗耐久
-			durabilityConsumption = 0 // 重置为0，然后累加实际消耗
-			for i := 0; i < residue; i++ {
-				// 计算概率：固定20%消耗耐久，80%不消耗
-				// 耐久I/II/III: 20% 消耗耐久，80% 不消耗
-				probability := 20 // 20%的概率消耗耐久
-				roll := rand.Intn(100)
-				logrus.Infof("耐久检定: 需要 < %d, 实际 = %d", probability, roll)
-
-				if roll < probability { // 小于概率值时消耗耐久
-					durabilityConsumption++
-					logrus.Infof("耐久检定失败，消耗耐久")
-				} else {
-					logrus.Infof("耐久检定成功，不消耗耐久")
-				}
-			}
-		}
-
-		// 经验修补附魔逻辑：消耗金钱修复耐久
-		// 确保经验修补等级在有效范围内
-		expRepairLevel := equipInfo.ExpRepair
-		if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-			expRepairLevel = 0
-			newEquipInfo.ExpRepair = 0
-		}
-
-		// 添加日志，确认使用的经验修补附魔等级
-		logrus.Infof("使用的经验修补附魔等级: %d", expRepairLevel)
-
-		// 先消耗耐久
-		newEquipInfo.Durable -= durabilityConsumption
-
-		// 然后应用经验修补效果
-		if expRepairLevel > 0 && newEquipInfo.Durable < durationList[equipInfo.Equip] {
-			// 计算需要修复的耐久值
-			repairNeeded := durationList[equipInfo.Equip] - newEquipInfo.Durable
-			logrus.Infof("需要修复的耐久值: %d", repairNeeded)
-
-			// 获取用户钱包余额
-			money := wallet.GetWalletOf(uid)
-			logrus.Infof("用户钱包余额: %d", money)
-
-			if money >= 2 { // 至少有2金钱才能修复
-				// 计算实际可以修复的耐久值 (根据经验修补等级增加修复效率)
-				repairRate := 1 + expRepairLevel // 经验修补I修复2点
-				actualRepair := (money / 2) * repairRate
-				if actualRepair > repairNeeded {
-					actualRepair = repairNeeded
-				}
-				logrus.Infof("实际修复的耐久值: %d", actualRepair)
-
-				// 扣除金钱
-				costMoney := actualRepair * 2 / repairRate
-				err = wallet.InsertWalletOf(uid, -costMoney)
-				if err != nil {
-					errMsg = "[ERROR at fish.go.5.2]:" + err.Error()
-					return
-				}
-				// 增加耐久
-				newEquipInfo.Durable += actualRepair
-				msg += "(经验修补：消耗" + strconv.Itoa(costMoney) + wallet.GetWalletName() + "修复了" + strconv.Itoa(actualRepair) + "点耐久)"
-			} else {
-				logrus.Infof("钱包余额不足，无法修复耐久")
-			}
-		} else {
-			if expRepairLevel <= 0 {
-				logrus.Infof("经验修补附魔等级为0，无法修复耐久")
-			}
-			if newEquipInfo.Durable >= durationList[equipInfo.Equip] {
-				logrus.Infof("耐久已满，无需修复")
-			}
-		}
-
-		err = dbdata.updateUserEquip(newEquipInfo)
-		if err != nil {
-			errMsg = "[ERROR at fish.go.5]:" + err.Error()
-			return
-		}
-
-		if newEquipInfo.Durable < 10 && newEquipInfo.Durable > 0 {
-			msg += "(你的鱼竿耐久仅剩" + strconv.Itoa(newEquipInfo.Durable) + ")"
-		} else if newEquipInfo.Durable <= 0 {
-			msg += "(你的鱼竿已销毁)"
-		}
-	} else {
-		// 美西螈不消耗耐久
-		err = dbdata.updateUserEquip(newEquipInfo)
-		if err != nil {
-			errMsg = "[ERROR at fish.go.5]:" + err.Error()
-			return
-		}
-	}
-
-	return
-}
-
 func init() {
 	engine.OnRegex(`^进行(([1-5]\d|[1-9])次)?钓鱼$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
@@ -244,10 +102,9 @@ func init() {
 		if equipInfo.Durable < fishNumber {
 			fishNumber = equipInfo.Durable
 		}
-		// 使用一个函数来处理钓鱼逻辑，减少锁的使用
-		residue, newEquipInfo, errMsg, newMsg := processFishing(uid, fishNumber, equipInfo)
-		if errMsg != "" {
-			ctx.SendChain(message.Text(errMsg))
+		residue, err := dbdata.updateFishInfo(uid, fishNumber)
+		if err != nil {
+			ctx.SendChain(message.Text("[ERROR at fish.go.1]:", err))
 			return
 		}
 		if residue == 0 {
@@ -255,14 +112,40 @@ func init() {
 			return
 		}
 		fishNumber = residue
-		msg := newMsg
-		equipInfo = newEquipInfo
-
-		if equipInfo.Equip == "三叉戟" {
-			fishNumber *= 3
-		}
-
-		if equipInfo.Equip == "美西螈" {
+		msg := ""
+		if equipInfo.Equip != "美西螈" {
+			i := 0
+			for i <= fishNumber {
+				if rand.Intn(100) < (60 + 40/(equipInfo.Moredurable+1)) {
+					equipInfo.Durable--
+				}
+				i++
+				if equipInfo.Durable < durationList[equipInfo.Equip] && equipInfo.Expfix > 0 {
+					equipInfo.Durable++
+					money := wallet.GetWalletOf(uid)
+					if money < 2 {
+						break
+					}
+					err = wallet.InsertWalletOf(uid, -2)
+					if err != nil {
+						ctx.SendChain(message.Text("[ERROR at store.go.10]:", err))
+					}
+				}
+			}
+			err = dbdata.updateUserEquip(equipInfo)
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR at fish.go.5]:", err))
+				return
+			}
+			if equipInfo.Durable < durationList[equipInfo.Equip] && equipInfo.Durable > 0 {
+				msg = "(你的鱼竿耐久剩余" + strconv.Itoa(equipInfo.Durable) + ")"
+			} else if equipInfo.Durable <= 0 {
+				msg = "(你的鱼竿已销毁)"
+			}
+			if equipInfo.Equip == "三叉戟" {
+				fishNumber *= 3
+			}
+		} else {
 			fishNames, err := dbdata.pickFishFor(uid, fishNumber*3)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5.1]:", err))
@@ -387,12 +270,12 @@ func init() {
 					picName = "海豚"
 					thingName = "海豚"
 				case dice >= probabilities["耐久"].Min && dice < probabilities["耐久"].Max:
-					typeOfThing = "article"
-					picName = "book"
+					typeOfThing = "pole"
+					picName = "耐久"
 					thingName = "耐久"
 				case dice >= probabilities["经验修补"].Min && dice < probabilities["经验修补"].Max:
-					typeOfThing = "article"
-					picName = "book"
+					typeOfThing = "pole"
+					picName = "经验修补"
 					thingName = "经验修补"
 				default:
 					typeOfThing = "article"
@@ -439,51 +322,9 @@ func init() {
 			if thingName != "" {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
-					// 随机生成鱼竿属性，包括耐久附魔和经验修补附魔
-					// 设置合理的附魔概率分布
-					durabilityRoll := rand.Intn(100)
-					var durabilityLevel int
-					if durabilityRoll < 1 {
-						durabilityLevel = 0  // 70%概率无附魔
-					} else if durabilityRoll < 2 {
-						durabilityLevel = 1  // 15%概率获得耐久I
-					} else if durabilityRoll < 3 {
-						durabilityLevel = 2  // 10%概率获得耐久II
-					} else {
-						durabilityLevel = 3  // 5%概率获得耐久III
-					}
-
-					expRepairRoll := rand.Intn(100)
-					var expRepairLevel int
-					if expRepairRoll < 1 {
-						expRepairLevel = 0  // 80%概率无附魔
-					} else {
-						expRepairLevel = 1  // 20%概率获得经验修补I
-					}
-
-					// 确保附魔等级在有效范围内
-					if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-						durabilityLevel = 0
-					}
-					if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-						expRepairLevel = 0
-					}
-
-					// 打印调试信息
-					logrus.Infof("生成鱼竿: %s, 耐久附魔等级: %d, 经验修补附魔等级: %d", thingName, durabilityLevel, expRepairLevel)
-
-					// 确保属性字符串包含所有必要的字段
-					durable := rand.Intn(durationList[thingName]) + 1
-					maintenance := rand.Intn(10)
-					induce := rand.Intn(3)
-					favor := rand.Intn(2)
-
-					info := strconv.Itoa(durable) +
-						"/" + strconv.Itoa(maintenance) + "/" +
-						strconv.Itoa(induce) + "/" + strconv.Itoa(favor) + "/" +
-						strconv.Itoa(durabilityLevel) + "/" + strconv.Itoa(expRepairLevel)
-
-					logrus.Infof("生成的鱼竿属性字符串: %s", info)
+					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
+						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
+						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2))
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
@@ -511,19 +352,6 @@ func init() {
 					}
 					newThing.Number += number
 				}
-				// 添加更多日志，确保附魔信息正确保存
-				if strings.Contains(thingName, "竿") {
-					logrus.Infof("保存到背包的鱼竿信息 - 名称: %s, 属性: %s", newThing.Name, newThing.Other)
-
-					// 解析属性字符串，确认附魔等级
-					poleInfo := strings.Split(newThing.Other, "/")
-					if len(poleInfo) >= 6 {
-						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
-						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
-						logrus.Infof("保存到背包的鱼竿附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
-					}
-				}
-
 				err = dbdata.updateUserThingInfo(uid, newThing)
 				if err != nil {
 					ctx.SendChain(message.Text("[ERROR at fish.go.7]:", err))

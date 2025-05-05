@@ -18,7 +18,6 @@ import (
 	"github.com/FloatTech/zbputils/control"
 	"github.com/FloatTech/zbputils/ctxext"
 	"github.com/FloatTech/zbputils/img/text"
-	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
@@ -175,14 +174,14 @@ func init() {
 	engine.OnFullMatch("查看钓鱼规则", getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		msg := "一款钓鱼模拟器\n----------指令----------\n" +
 			"- 钓鱼看板/钓鱼商店\n- 购买xxx\n- 购买xxx [数量]\n- 出售xxx\n- 出售xxx [数量]\n- 出售所有垃圾\n" +
-			"- 钓鱼背包\n- 装备[xx竿|三叉戟|美西螈]\n- 附魔[诱钓|海之眷顾|耐久|经验修补]\n- 修复鱼竿\n- 合成[xx竿|三叉戟]\n- 消除[绑定|宝藏]诅咒\n- 消除[绑定|宝藏]诅咒 [数量]\n" +
+			"- 钓鱼背包\n- 装备[xx竿|三叉戟|美西螈]\n- 附魔[诱钓|海之眷顾]\n- 修复鱼竿\n- 合成[xx竿|三叉戟]\n- 消除[绑定|宝藏]诅咒\n- 消除[绑定|宝藏]诅咒 [数量]\n" +
 			"- 进行钓鱼\n- 进行n次钓鱼\n- " +
 			"当前装备概率明细\n" +
 			"规则V" + version + ":\n" +
 			"1.每日的商店价格是波动的!!如何最大化收益自己考虑一下喔\n" +
 			"2.装备信息:\n-> 木竿 : 耐久上限:30 均价:100 上钩概率:0.7%\n-> 铁竿 : 耐久上限:50 均价:300 上钩概率:0.2%\n-> 金竿 : 耐久上限:70 均价700 上钩概率:0.06%\n" +
 			"-> 钻石竿 : 耐久上限:100 均价1500 上钩概率:0.03%\n-> 下界合金竿 : 耐久上限:150 均价3100 上钩概率:0.01%\n-> 三叉戟 : 可使1次钓鱼视为3次钓鱼. 耐久上限:300 均价4000 只能合成、修复和交易\n" +
-			"3.附魔书信息:\n-> 诱钓 : 减少上钩时间. 均价:1000, 上钩概率:0.?%\n-> 海之眷顾 : 增加宝藏上钩概率. 均价:2500, 上钩概率:0.?%\n-> 耐久 : 使用鱼竿时只有20%的几率会消耗耐久值，80%的几率不消耗. 均价:3000, 上钩概率:0.?%\n-> 经验修补 : 使用鱼竿时消耗2点钱包金额对鱼竿进行修复. 均价:5000, 上钩概率:0.?%\n" +
+			"3.附魔书信息:\n-> 诱钓 : 减少上钩时间. 均价:1000, 上钩概率:0.?%\n-> 海之眷顾 : 增加宝藏上钩概率. 均价:2500, 上钩概率:0.?%\n-> 耐久 : 使用鱼竿时只有(60 + 40/(等级+1))%的几率会消耗耐久值. 均价:3000, 上钩概率:0.?%\n-> 经验修补 : 使用鱼竿时消耗2点钱包金额对鱼竿进行修复. 均价:5000, 上钩概率:0.?%\n" +
 			"4.稀有物品:\n-> 唱片 : 出售物品时使用该物品使价格翻倍. 均价:3000, 上钩概率:0.01%\n" +
 			"-> 美西螈 : 可装备,获得隐形[钓鱼佬]buff,并让钓到除鱼竿和美西螈外的物品数量变成5,无耐久上限.不可修复/附魔,每次钓鱼消耗3条鱼. 均价:3000, 上钩概率:0.01%\n" +
 			"-> 海豚 : 使空竿概率变成垃圾概率. 均价:1000, 上钩概率:0.19%\n" +
@@ -192,7 +191,7 @@ func init() {
 			"7.物品BUFF:\n-> 钓鱼佬 : 当背包名字含有'鱼'的物品数量超过100时激活,钓到物品概率提高至90%\n-> 修复大师 : 当背包鱼竿数量超过10时激活,修复物品时耐久百分百继承\n" +
 			"8.合成:\n-> 铁竿 : 3x木竿\n-> 金竿 : 3x铁竿\n-> 钻石竿 : 3x金竿\n-> 下界合金竿 : 3x钻石竿\n-> 三叉戟 : 3x下界合金竿\n注:合成成功率90%(包括梭哈),合成鱼竿的附魔等级=（附魔等级合/合成鱼竿数量）\n" +
 			"9.杂项:\n-> 无装备的情况下,每人最多可以购买3次100块钱的鱼竿,商店每日会上架1木竿\n-> 默认状态钓鱼上钩概率为60%(理论值!!!)\n-> 附魔的鱼竿会因附魔变得昂贵,每个附魔最高3级\n-> 三叉戟不算鱼竿,修复时可直接满耐久\n" +
-			"-> 鱼竿数量大于50的不能买东西;\n     鱼竿数量大于30的不能钓鱼;\n     每购/售10次鱼竿获得1层宝藏诅咒;\n     每购买20次物品将获得3次价格减半福利;\n     每钓鱼75次获得1本净化书;\n" +
+			"-> 鱼竿数量大于50的不能买东西;\n     鱼竿数量大于100的不能钓鱼;\n     每购/售10次鱼竿获得1层宝藏诅咒;\n     每购买20次物品将获得3次价格减半福利;\n     每钓鱼75次获得1本净化书;\n" +
 			"     每天可交易鱼竿10个，购买物品30件（垃圾除外）."
 
 		ctx.Send(msg)
@@ -302,7 +301,7 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	}
 	_, textH := canvas.MeasureString("装备信息")
 
-	backDY := math.Max(int(10+titleH*2+(textH*2)*6+10), 400)
+	backDY := math.Max(int(10+titleH*2+(textH*2)*4+10), 300)
 
 	canvas = gg.NewContext(1000, backDY)
 	// 画底色
@@ -380,78 +379,10 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	canvas.SetColor(color.Black)
 	canvas.DrawStringAnchored(maintenance, textDx+textW+5+barW+5+valueW/2, textDy+textH/2, 0.5, 0.5)
 
-	textDy += textH * 2.5
-	// 使用更小的字体显示附魔信息
-	if err = canvas.ParseFontFace(fontdata, 40); err != nil {
-		return nil, err
-	}
-
-	// 从数据库重新读取装备信息，确保获取最新的附魔等级
-	freshEquipInfo, err := dbdata.getUserEquip(equipInfo.ID)
-	if err != nil {
-		logrus.Errorf("获取装备信息失败: %v", err)
-		// 如果获取失败，使用传入的装备信息
-		freshEquipInfo = equipInfo
-	}
-
-	// 直接使用数据库中的附魔等级，不再从背包中查找
-	// 确保附魔等级在有效范围内
-	induceLevel := freshEquipInfo.Induce
-	if induceLevel < 0 || induceLevel >= len(enchantLevel) {
-		induceLevel = 0
-	}
-
-	favorLevel := freshEquipInfo.Favor
-	if favorLevel < 0 || favorLevel >= len(enchantLevel) {
-		favorLevel = 0
-	}
-
-	// 强制使用数据库中的附魔等级
-	durabilityLevel := freshEquipInfo.Durability
-	if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
-		durabilityLevel = 0
-	}
-
-	expRepairLevel := freshEquipInfo.ExpRepair
-	if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
-		expRepairLevel = 0
-	}
-
-	// 添加日志，确认钓鱼背包显示的附魔等级
-	logrus.Infof("钓鱼背包显示的附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
-
-	// 打印完整的装备信息，帮助调试
-	logrus.Infof("钓鱼背包显示的完整装备信息 - 耐久: %d, 维修次数: %d, 诱钓: %d, 海之眷顾: %d, 耐久附魔: %d, 经验修补: %d",
-		freshEquipInfo.Durable, freshEquipInfo.Maintenance, freshEquipInfo.Induce, freshEquipInfo.Favor, freshEquipInfo.Durability, freshEquipInfo.ExpRepair)
-
-	// 检查装备信息是否与数据库中的一致，如果不一致则更新
-	if equipInfo.Durability != durabilityLevel || equipInfo.ExpRepair != expRepairLevel {
-		logrus.Infof("装备信息与数据库不一致，更新装备信息 - 原始值: 耐久附魔 %d, 经验修补 %d, 新值: 耐久附魔 %d, 经验修补 %d",
-			equipInfo.Durability, equipInfo.ExpRepair, durabilityLevel, expRepairLevel)
-
-		// 更新传入的装备信息
-		equipInfo.Durability = durabilityLevel
-		equipInfo.ExpRepair = expRepairLevel
-
-		// 尝试更新数据库中的装备信息，确保一致性
-		updateErr := dbdata.updateUserEquip(equipInfo)
-		if updateErr != nil {
-			logrus.Errorf("更新装备信息失败: %v", updateErr)
-		} else {
-			logrus.Infof("已更新数据库中的装备信息")
-		}
-	}
-
-	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[induceLevel], textDx, textDy)
-
-	textDy += textH * 1
-	canvas.DrawString(" 附魔: 海之眷顾 "+enchantLevel[favorLevel], textDx, textDy)
-
-	textDy += textH * 1
-	canvas.DrawString(" 附魔: 耐久 "+enchantLevel[durabilityLevel], textDx, textDy)
-
-	textDy += textH * 1
-	canvas.DrawString(" 附魔: 经验修补 "+enchantLevel[expRepairLevel], textDx, textDy)
+	textDy += textH * 3
+	canvas.DrawString(" 附魔: 诱钓"+enchantLevel[equipInfo.Induce]+"  海之眷顾"+enchantLevel[equipInfo.Favor], textDx, textDy)
+	textDy += textH * 1.5
+	canvas.DrawString(" 附魔: 耐久"+enchantLevel[equipInfo.Moredurable]+"  经验修补"+enchantLevel[equipInfo.Expfix], textDx, textDy)
 	return canvas.Image(), nil
 }
 
