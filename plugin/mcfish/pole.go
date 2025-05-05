@@ -216,6 +216,10 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at pole.go.3]:", err))
 			return
 		}
+
+		// 添加日志，确认装备前的附魔等级
+		logrus.Infof("最终保存到数据库的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
+
 		err = dbdata.updateUserEquip(newEquipInfo)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.3.1]:", err))
@@ -234,13 +238,13 @@ func init() {
 				expRepairLevel = 0
 			}
 
-			// 构建属性字符串，使用当前装备的附魔等级
+			// 构建属性字符串，使用新装备的附魔等级
 			attrStr := strconv.Itoa(equipInfo.Durable) + "/" +
 				strconv.Itoa(equipInfo.Maintenance) + "/" +
 				strconv.Itoa(equipInfo.Induce) + "/" +
 				strconv.Itoa(equipInfo.Favor) + "/" +
-				strconv.Itoa(durabilityLevel) + "/" +  // 使用当前装备的耐久附魔等级
-				strconv.Itoa(expRepairLevel)           // 使用当前装备的经验修补附魔等级
+				strconv.Itoa(newEquipInfo.Durability) + "/" +  // 使用新装备的耐久附魔等级
+				strconv.Itoa(newEquipInfo.ExpRepair)           // 使用新装备的经验修补附魔等级
 
 			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
 
@@ -269,6 +273,21 @@ func init() {
 				oldthing.Number++
 			}
 		}
+		// 确保旧装备的附魔等级与新装备一致
+		if oldthing.Other != "" {
+			poleInfo := strings.Split(oldthing.Other, "/")
+			if len(poleInfo) >= 6 {
+				// 更新附魔等级
+				poleInfo[4] = strconv.Itoa(newEquipInfo.Durability)
+				poleInfo[5] = strconv.Itoa(newEquipInfo.ExpRepair)
+
+				// 重新构建属性字符串
+				oldthing.Other = strings.Join(poleInfo, "/")
+
+				logrus.Infof("更新旧装备的属性字符串: %s", oldthing.Other)
+			}
+		}
+
 		err = dbdata.updateUserThingInfo(uid, oldthing)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.4]:", err))
