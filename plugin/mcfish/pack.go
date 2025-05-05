@@ -432,6 +432,14 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 		// 更新传入的装备信息
 		equipInfo.Durability = durabilityLevel
 		equipInfo.ExpRepair = expRepairLevel
+
+		// 尝试更新数据库中的装备信息，确保一致性
+		updateErr := dbdata.updateUserEquip(equipInfo)
+		if updateErr != nil {
+			logrus.Errorf("更新装备信息失败: %v", updateErr)
+		} else {
+			logrus.Infof("已更新数据库中的装备信息")
+		}
 	}
 
 	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[induceLevel], textDx, textDy)
