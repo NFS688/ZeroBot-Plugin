@@ -394,6 +394,7 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 		freshEquipInfo = equipInfo
 	}
 
+	// 直接使用数据库中的附魔等级，不再从背包中查找
 	// 确保附魔等级在有效范围内
 	induceLevel := freshEquipInfo.Induce
 	if induceLevel < 0 || induceLevel >= len(enchantLevel) {
@@ -405,6 +406,7 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 		favorLevel = 0
 	}
 
+	// 强制使用数据库中的附魔等级
 	durabilityLevel := freshEquipInfo.Durability
 	if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
 		durabilityLevel = 0

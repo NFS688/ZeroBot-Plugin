@@ -586,72 +586,10 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	// 添加日志，记录从数据库读取的附魔等级
 	logrus.Infof("从数据库读取的附魔等级 - 耐久附魔: %d, 经验修补: %d", temp.Durability, temp.ExpRepair)
 
-	// 始终尝试从背包中查找对应鱼竿的附魔信息，确保数据一致性
+	// 不再从背包中查找附魔信息，直接使用数据库中的值
 	if temp.Equip != "" && temp.Equip != "美西螈" {
-		packName := strconv.FormatInt(uid, 10) + "Pack"
-		var packItem article
-
-		// 尝试从背包中找到对应的鱼竿
-		if sql.db.CanFind(packName, "WHERE Name = ? AND Type = 'pole'", temp.Equip) {
-			var items []article
-			err := sql.db.FindFor(packName, &packItem, "WHERE Name = ? AND Type = 'pole'", func() error {
-				items = append(items, packItem)
-				return nil
-			}, temp.Equip)
-
-			if err == nil && len(items) > 0 {
-				// 找到了背包中的鱼竿，尝试解析附魔信息
-				maxDurabilityLevel := 0
-				maxExpRepairLevel := 0
-
-				for _, item := range items {
-					poleInfo := strings.Split(item.Other, "/")
-					logrus.Infof("从背包解析鱼竿属性，原始字符串: %s", item.Other)
-
-					// 确保属性字符串至少有6个字段
-					if len(poleInfo) >= 6 {
-						// 从第5个字段解析耐久附魔等级
-						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
-						// 从第6个字段解析经验修补附魔等级
-						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
-
-						// 添加日志，记录解析的附魔等级
-						logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
-						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
-
-						// 更新最高附魔等级
-						if durabilityLevel > maxDurabilityLevel {
-							maxDurabilityLevel = durabilityLevel
-						}
-						if expRepairLevel > maxExpRepairLevel {
-							maxExpRepairLevel = expRepairLevel
-						}
-					}
-				}
-
-				// 使用背包中找到的最高附魔等级
-				if maxDurabilityLevel > 0 {
-					userInfo.Durability = maxDurabilityLevel
-					logrus.Infof("从背包更新的耐久附魔等级: %d", maxDurabilityLevel)
-				}
-
-				if maxExpRepairLevel > 0 {
-					userInfo.ExpRepair = maxExpRepairLevel
-					logrus.Infof("从背包更新的经验修补附魔等级: %d", maxExpRepairLevel)
-				}
-
-				// 如果背包中的附魔等级与数据库中的不一致，更新数据库
-				if userInfo.Durability != temp.Durability || userInfo.ExpRepair != temp.ExpRepair {
-					logrus.Infof("数据库中的附魔等级与背包中的不一致，更新数据库 - 数据库: 耐久附魔 %d, 经验修补 %d, 背包: 耐久附魔 %d, 经验修补 %d",
-						temp.Durability, temp.ExpRepair, userInfo.Durability, userInfo.ExpRepair)
-
-					// 更新数据库中的附魔等级
-					temp.Durability = userInfo.Durability
-					temp.ExpRepair = userInfo.ExpRepair
-					_ = sql.db.Insert("equips", &temp)
-				}
-			}
-		}
+		// 添加日志，记录从数据库读取的附魔等级
+		logrus.Infof("最终使用的附魔等级 - 耐久附魔: %d, 经验修补: %d", userInfo.Durability, userInfo.ExpRepair)
 	}
 
 	return
