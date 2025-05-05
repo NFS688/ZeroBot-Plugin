@@ -161,6 +161,22 @@ func init() {
 		}
 		newEquipInfo := poles[index]
 		packEquip := articles[index]
+
+		// 添加日志，确认装备前的附魔等级
+		logrus.Infof("装备前的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
+
+		// 确保附魔等级在有效范围内
+		if newEquipInfo.Durability < 0 || newEquipInfo.Durability >= len(enchantLevel) {
+			newEquipInfo.Durability = 0
+		}
+
+		if newEquipInfo.ExpRepair < 0 || newEquipInfo.ExpRepair >= len(enchantLevel) {
+			newEquipInfo.ExpRepair = 0
+		}
+
+		// 添加日志，确认装备后的附魔等级
+		logrus.Infof("装备后的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
+
 		packEquip.Number--
 		err = dbdata.updateUserThingInfo(uid, packEquip)
 		if err != nil {

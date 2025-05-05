@@ -472,8 +472,41 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 		userInfo.Maintenance = oldTemp.Maintenance
 		userInfo.Induce = oldTemp.Induce
 		userInfo.Favor = oldTemp.Favor
-		userInfo.Durability = 0
-		userInfo.ExpRepair = 0
+
+		// 检查是否有附魔信息
+		// 从背包中查找该装备的附魔信息
+		packName := strconv.FormatInt(uid, 10) + "Pack"
+		var packItem article
+		var durabilityLevel, expRepairLevel int
+
+		// 尝试从背包中找到对应的鱼竿
+		if sql.db.CanFind(packName, "WHERE Name = ? AND Type = 'pole'", oldTemp.Equip) {
+			var items []article
+			err := sql.db.FindFor(packName, &packItem, "WHERE Name = ? AND Type = 'pole'", func() error {
+				items = append(items, packItem)
+				return nil
+			}, oldTemp.Equip)
+
+			if err == nil && len(items) > 0 {
+				// 找到了背包中的鱼竿，尝试解析附魔信息
+				for _, item := range items {
+					poleInfo := strings.Split(item.Other, "/")
+					if len(poleInfo) > 4 {
+						durabilityLevel, _ = strconv.Atoi(poleInfo[4])
+					}
+					if len(poleInfo) > 5 {
+						expRepairLevel, _ = strconv.Atoi(poleInfo[5])
+					}
+					// 找到一个有附魔的就跳出
+					if durabilityLevel > 0 || expRepairLevel > 0 {
+						break
+					}
+				}
+			}
+		}
+
+		userInfo.Durability = durabilityLevel
+		userInfo.ExpRepair = expRepairLevel
 
 		// 升级数据库表结构（不使用异步，避免数据库锁定问题）
 		// 创建一个新的临时结构体，包含所有字段
@@ -488,7 +521,7 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 			ExpRepair   int
 		}
 
-		// 将旧数据复制到新结构体中
+		// 将旧数据复制到新结构体中，包括附魔信息
 		newTemp := tempEquip{
 			ID:          oldTemp.ID,
 			Equip:       oldTemp.Equip,
@@ -496,8 +529,8 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 			Maintenance: oldTemp.Maintenance,
 			Induce:      oldTemp.Induce,
 			Favor:       oldTemp.Favor,
-			Durability:  0,
-			ExpRepair:   0,
+			Durability:  durabilityLevel,
+			ExpRepair:   expRepairLevel,
 		}
 
 		// 删除旧数据

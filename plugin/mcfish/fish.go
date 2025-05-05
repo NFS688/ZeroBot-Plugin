@@ -427,11 +427,11 @@ func init() {
 					// 增加生成更高级附魔的概率
 					durabilityRoll := rand.Intn(100)
 					var durabilityLevel int
-					if durabilityRoll < 60 {
+					if durabilityRoll < 1 {
 						durabilityLevel = 0
-					} else if durabilityRoll < 85 {
+					} else if durabilityRoll < 2 {
 						durabilityLevel = 1
-					} else if durabilityRoll < 95 {
+					} else if durabilityRoll < 3 {
 						durabilityLevel = 2
 					} else {
 						durabilityLevel = 3
@@ -439,7 +439,7 @@ func init() {
 
 					expRepairRoll := rand.Intn(100)
 					var expRepairLevel int
-					if expRepairRoll < 70 {
+					if expRepairRoll < 1 {
 						expRepairLevel = 0
 					} else {
 						expRepairLevel = 1

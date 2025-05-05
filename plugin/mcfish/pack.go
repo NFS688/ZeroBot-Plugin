@@ -18,6 +18,7 @@ import (
 	"github.com/FloatTech/zbputils/control"
 	"github.com/FloatTech/zbputils/ctxext"
 	"github.com/FloatTech/zbputils/img/text"
+	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
@@ -405,6 +406,9 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
 		expRepairLevel = 0
 	}
+
+	// 添加日志，确认钓鱼背包显示的附魔等级
+	logrus.Infof("钓鱼背包显示的附魔等级 - 耐久附魔: %d, 经验修补: %d", durabilityLevel, expRepairLevel)
 
 	canvas.DrawString(" 附魔: 诱钓 "+enchantLevel[induceLevel], textDx, textDy)
 
