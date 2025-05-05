@@ -187,17 +187,6 @@ func upgradeEquipsTable(ctx *zero.Ctx) error {
 	}
 
 	// 检查表结构是否需要升级
-	// 创建一个临时结构体，用于检查表结构
-	type tempEquip struct {
-		ID          int64
-		Equip       string
-		Durable     int
-		Maintenance int
-		Induce      int
-		Favor       int
-		Durability  int
-		ExpRepair   int
-	}
 
 	// 尝试创建临时结构体
 	var temp tempEquip
@@ -489,18 +478,6 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	}
 
 	// 使用结构体查询
-	type tempEquip struct {
-		ID          int64
-		Equip       string
-		Durable     int
-		Maintenance int
-		Induce      int
-		Favor       int
-		Durability  int
-		ExpRepair   int
-	}
-
-	var temp tempEquip
 	err = sql.db.Find("equips", &temp, "WHERE ID = ?", uid)
 	if err != nil {
 		logrus.Errorf("查询装备信息失败: %v", err)
@@ -521,7 +498,8 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	if userInfo.Durability < 0 || userInfo.Durability >= len(enchantLevel) {
 		userInfo.Durability = 0
 		// 更新数据库中的值
-		_, err = sql.db.DB.Exec("UPDATE equips SET Durability = 0 WHERE ID = ?", uid)
+		temp.Durability = 0
+		err = sql.db.Insert("equips", &temp)
 		if err != nil {
 			logrus.Errorf("更新耐久附魔等级失败: %v", err)
 		}
@@ -529,7 +507,8 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	if userInfo.ExpRepair < 0 || userInfo.ExpRepair >= len(enchantLevel) {
 		userInfo.ExpRepair = 0
 		// 更新数据库中的值
-		_, err = sql.db.DB.Exec("UPDATE equips SET ExpRepair = 0 WHERE ID = ?", uid)
+		temp.ExpRepair = 0
+		err = sql.db.Insert("equips", &temp)
 		if err != nil {
 			logrus.Errorf("更新经验修补附魔等级失败: %v", err)
 		}
