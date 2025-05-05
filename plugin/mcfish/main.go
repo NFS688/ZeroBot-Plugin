@@ -369,11 +369,6 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	if err != nil {
 		return
 	}
-	// 删除旧表并重新创建以更新结构
-	if !sql.db.CanFind("equips", "WHERE ID = ?", userInfo.ID) {
-		return sql.db.Insert("equips", &userInfo)
-	}
-	// 如果耐久为0，删除装备
 	if userInfo.Durable == 0 {
 		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
