@@ -194,6 +194,19 @@ func init() {
 			newEquipInfo.ExpRepair = 0
 		}
 
+		// 更新背包中的鱼竿属性字符串，确保一致性
+		updatedAttrStr := strconv.Itoa(packEquip.Number) + "/" +
+			poleInfo[1] + "/" +
+			poleInfo[2] + "/" +
+			poleInfo[3] + "/" +
+			strconv.Itoa(newEquipInfo.Durability) + "/" +
+			strconv.Itoa(newEquipInfo.ExpRepair)
+
+		if packEquip.Other != updatedAttrStr {
+			logrus.Infof("更新背包中的鱼竿属性字符串: %s -> %s", packEquip.Other, updatedAttrStr)
+			packEquip.Other = updatedAttrStr
+		}
+
 		// 添加日志，确认装备后的附魔等级
 		logrus.Infof("装备后的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
 
@@ -221,13 +234,13 @@ func init() {
 				expRepairLevel = 0
 			}
 
-			// 构建属性字符串
+			// 构建属性字符串，使用新装备的附魔等级
 			attrStr := strconv.Itoa(equipInfo.Durable) + "/" +
 				strconv.Itoa(equipInfo.Maintenance) + "/" +
 				strconv.Itoa(equipInfo.Induce) + "/" +
 				strconv.Itoa(equipInfo.Favor) + "/" +
-				strconv.Itoa(equipInfo.Durability) + "/" +  // 使用装备的附魔等级，而不是局部变量
-				strconv.Itoa(equipInfo.ExpRepair)           // 使用装备的附魔等级，而不是局部变量
+				strconv.Itoa(newEquipInfo.Durability) + "/" +  // 使用新装备的附魔等级
+				strconv.Itoa(newEquipInfo.ExpRepair)           // 使用新装备的附魔等级
 
 			logrus.Infof("装备鱼竿时存储属性，生成的属性字符串: %s", attrStr)
 

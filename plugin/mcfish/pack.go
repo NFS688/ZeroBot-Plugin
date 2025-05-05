@@ -386,23 +386,31 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 		return nil, err
 	}
 
+	// 从数据库重新读取装备信息，确保获取最新的附魔等级
+	freshEquipInfo, err := dbdata.getUserEquip(equipInfo.ID)
+	if err != nil {
+		logrus.Errorf("获取装备信息失败: %v", err)
+		// 如果获取失败，使用传入的装备信息
+		freshEquipInfo = equipInfo
+	}
+
 	// 确保附魔等级在有效范围内
-	induceLevel := equipInfo.Induce
+	induceLevel := freshEquipInfo.Induce
 	if induceLevel < 0 || induceLevel >= len(enchantLevel) {
 		induceLevel = 0
 	}
 
-	favorLevel := equipInfo.Favor
+	favorLevel := freshEquipInfo.Favor
 	if favorLevel < 0 || favorLevel >= len(enchantLevel) {
 		favorLevel = 0
 	}
 
-	durabilityLevel := equipInfo.Durability
+	durabilityLevel := freshEquipInfo.Durability
 	if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
 		durabilityLevel = 0
 	}
 
-	expRepairLevel := equipInfo.ExpRepair
+	expRepairLevel := freshEquipInfo.ExpRepair
 	if expRepairLevel < 0 || expRepairLevel >= len(enchantLevel) {
 		expRepairLevel = 0
 	}

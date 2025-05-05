@@ -33,6 +33,18 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 		// 耐久附魔逻辑：根据等级计算是否消耗耐久
 		durabilityConsumption := residue
 
+		// 从数据库重新读取装备信息，确保获取最新的附魔等级
+		freshEquipInfo, err := dbdata.getUserEquip(uid)
+		if err != nil {
+			logrus.Errorf("获取装备信息失败: %v", err)
+			// 如果获取失败，使用传入的装备信息
+			freshEquipInfo = equipInfo
+		} else {
+			// 更新装备信息
+			equipInfo = freshEquipInfo
+			newEquipInfo = freshEquipInfo
+		}
+
 		// 确保耐久附魔等级在有效范围内
 		durabilityLevel := equipInfo.Durability
 		if durabilityLevel < 0 || durabilityLevel >= len(enchantLevel) {
@@ -75,6 +87,9 @@ func processFishing(uid int64, fishNumber int, equipInfo equip) (residue int, ne
 			expRepairLevel = 0
 			newEquipInfo.ExpRepair = 0
 		}
+
+		// 添加日志，确认使用的经验修补附魔等级
+		logrus.Infof("使用的经验修补附魔等级: %d", expRepairLevel)
 
 		// 先消耗耐久
 		newEquipInfo.Durable -= durabilityConsumption

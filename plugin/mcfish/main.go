@@ -581,8 +581,8 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	// 添加日志，记录从数据库读取的附魔等级
 	logrus.Infof("从数据库读取的附魔等级 - 耐久附魔: %d, 经验修补: %d", temp.Durability, temp.ExpRepair)
 
-	// 如果附魔等级为0，尝试从背包中查找对应鱼竿的附魔信息
-	if (temp.Durability == 0 || temp.ExpRepair == 0) && temp.Equip != "" && temp.Equip != "美西螈" {
+	// 始终尝试从背包中查找对应鱼竿的附魔信息，确保数据一致性
+	if temp.Equip != "" && temp.Equip != "美西螈" {
 		packName := strconv.FormatInt(uid, 10) + "Pack"
 		var packItem article
 
@@ -596,30 +596,50 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 
 			if err == nil && len(items) > 0 {
 				// 找到了背包中的鱼竿，尝试解析附魔信息
+				maxDurabilityLevel := 0
+				maxExpRepairLevel := 0
+
 				for _, item := range items {
 					poleInfo := strings.Split(item.Other, "/")
+					logrus.Infof("从背包解析鱼竿属性，原始字符串: %s", item.Other)
+
 					if len(poleInfo) > 4 {
 						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
-						if durabilityLevel > 0 {
-							userInfo.Durability = durabilityLevel
-							logrus.Infof("从背包更新的耐久附魔等级: %d", durabilityLevel)
+						logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+						if durabilityLevel > maxDurabilityLevel {
+							maxDurabilityLevel = durabilityLevel
 						}
 					}
+
 					if len(poleInfo) > 5 {
 						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
-						if expRepairLevel > 0 {
-							userInfo.ExpRepair = expRepairLevel
-							logrus.Infof("从背包更新的经验修补附魔等级: %d", expRepairLevel)
+						logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+						if expRepairLevel > maxExpRepairLevel {
+							maxExpRepairLevel = expRepairLevel
 						}
 					}
-					// 找到一个有附魔的就跳出
-					if userInfo.Durability > 0 || userInfo.ExpRepair > 0 {
-						// 更新数据库中的附魔等级
-						temp.Durability = userInfo.Durability
-						temp.ExpRepair = userInfo.ExpRepair
-						_ = sql.db.Insert("equips", &temp)
-						break
-					}
+				}
+
+				// 使用背包中找到的最高附魔等级
+				if maxDurabilityLevel > 0 {
+					userInfo.Durability = maxDurabilityLevel
+					logrus.Infof("从背包更新的耐久附魔等级: %d", maxDurabilityLevel)
+				}
+
+				if maxExpRepairLevel > 0 {
+					userInfo.ExpRepair = maxExpRepairLevel
+					logrus.Infof("从背包更新的经验修补附魔等级: %d", maxExpRepairLevel)
+				}
+
+				// 如果背包中的附魔等级与数据库中的不一致，更新数据库
+				if userInfo.Durability != temp.Durability || userInfo.ExpRepair != temp.ExpRepair {
+					logrus.Infof("数据库中的附魔等级与背包中的不一致，更新数据库 - 数据库: 耐久附魔 %d, 经验修补 %d, 背包: 耐久附魔 %d, 经验修补 %d",
+						temp.Durability, temp.ExpRepair, userInfo.Durability, userInfo.ExpRepair)
+
+					// 更新数据库中的附魔等级
+					temp.Durability = userInfo.Durability
+					temp.ExpRepair = userInfo.ExpRepair
+					_ = sql.db.Insert("equips", &temp)
 				}
 			}
 		}
