@@ -581,6 +581,50 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 	// 添加日志，记录从数据库读取的附魔等级
 	logrus.Infof("从数据库读取的附魔等级 - 耐久附魔: %d, 经验修补: %d", temp.Durability, temp.ExpRepair)
 
+	// 如果附魔等级为0，尝试从背包中查找对应鱼竿的附魔信息
+	if (temp.Durability == 0 || temp.ExpRepair == 0) && temp.Equip != "" && temp.Equip != "美西螈" {
+		packName := strconv.FormatInt(uid, 10) + "Pack"
+		var packItem article
+
+		// 尝试从背包中找到对应的鱼竿
+		if sql.db.CanFind(packName, "WHERE Name = ? AND Type = 'pole'", temp.Equip) {
+			var items []article
+			err := sql.db.FindFor(packName, &packItem, "WHERE Name = ? AND Type = 'pole'", func() error {
+				items = append(items, packItem)
+				return nil
+			}, temp.Equip)
+
+			if err == nil && len(items) > 0 {
+				// 找到了背包中的鱼竿，尝试解析附魔信息
+				for _, item := range items {
+					poleInfo := strings.Split(item.Other, "/")
+					if len(poleInfo) > 4 {
+						durabilityLevel, _ := strconv.Atoi(poleInfo[4])
+						if durabilityLevel > 0 {
+							userInfo.Durability = durabilityLevel
+							logrus.Infof("从背包更新的耐久附魔等级: %d", durabilityLevel)
+						}
+					}
+					if len(poleInfo) > 5 {
+						expRepairLevel, _ := strconv.Atoi(poleInfo[5])
+						if expRepairLevel > 0 {
+							userInfo.ExpRepair = expRepairLevel
+							logrus.Infof("从背包更新的经验修补附魔等级: %d", expRepairLevel)
+						}
+					}
+					// 找到一个有附魔的就跳出
+					if userInfo.Durability > 0 || userInfo.ExpRepair > 0 {
+						// 更新数据库中的附魔等级
+						temp.Durability = userInfo.Durability
+						temp.ExpRepair = userInfo.ExpRepair
+						_ = sql.db.Insert("equips", &temp)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	return
 }
 
@@ -588,6 +632,9 @@ func (sql *fishdb) getUserEquip(uid int64) (userInfo equip, err error) {
 func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	sql.Lock()
 	defer sql.Unlock()
+
+	// 添加日志，记录要保存的附魔等级
+	logrus.Infof("保存到数据库的附魔等级 - 耐久附魔: %d, 经验修补: %d", userInfo.Durability, userInfo.ExpRepair)
 
 	// 尝试使用旧结构体检查表结构
 	type oldEquip struct {
@@ -680,7 +727,31 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	if userInfo.Durable == 0 {
 		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
 	}
-	return sql.db.Insert("equips", &temp)
+
+	// 插入数据
+	err = sql.db.Insert("equips", &temp)
+
+	// 如果成功插入，再次检查附魔等级是否正确保存
+	if err == nil {
+		var checkTemp tempEquip
+		checkErr := sql.db.Find("equips", &checkTemp, "WHERE ID = ?", userInfo.ID)
+		if checkErr == nil {
+			logrus.Infof("检查保存后的附魔等级 - 耐久附魔: %d, 经验修补: %d", checkTemp.Durability, checkTemp.ExpRepair)
+
+			// 如果附魔等级不一致，再次尝试保存
+			if checkTemp.Durability != userInfo.Durability || checkTemp.ExpRepair != userInfo.ExpRepair {
+				logrus.Infof("附魔等级不一致，重新保存")
+
+				// 删除旧数据
+				_ = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+
+				// 重新插入数据
+				return sql.db.Insert("equips", &temp)
+			}
+		}
+	}
+
+	return err
 }
 
 func (sql *fishdb) pickFishFor(uid int64, number int) (fishNames map[string]int, err error) {

@@ -165,6 +165,26 @@ func init() {
 		// 添加日志，确认装备前的附魔等级
 		logrus.Infof("装备前的附魔等级 - 耐久附魔: %d, 经验修补: %d", newEquipInfo.Durability, newEquipInfo.ExpRepair)
 
+		// 解析背包中的鱼竿属性字符串，确保获取正确的附魔等级
+		poleInfo := strings.Split(packEquip.Other, "/")
+
+		// 添加详细日志，查看解析过程
+		logrus.Infof("装备鱼竿时解析属性，原始字符串: %s", packEquip.Other)
+		logrus.Infof("解析后的数组长度: %d", len(poleInfo))
+
+		// 确保属性字符串包含所有必要的字段
+		if len(poleInfo) > 4 {
+			durabilityLevel, _ := strconv.Atoi(poleInfo[4])
+			logrus.Infof("从背包解析的耐久附魔等级: %d, 原始值: %s", durabilityLevel, poleInfo[4])
+			newEquipInfo.Durability = durabilityLevel
+		}
+
+		if len(poleInfo) > 5 {
+			expRepairLevel, _ := strconv.Atoi(poleInfo[5])
+			logrus.Infof("从背包解析的经验修补附魔等级: %d, 原始值: %s", expRepairLevel, poleInfo[5])
+			newEquipInfo.ExpRepair = expRepairLevel
+		}
+
 		// 确保附魔等级在有效范围内
 		if newEquipInfo.Durability < 0 || newEquipInfo.Durability >= len(enchantLevel) {
 			newEquipInfo.Durability = 0
