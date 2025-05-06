@@ -301,7 +301,8 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	}
 	_, textH := canvas.MeasureString("装备信息")
 
-	backDY := math.Max(int(10+titleH*2+(textH*2)*4+10), 300)
+	// 增加背景高度，确保附魔信息完整显示
+	backDY := math.Max(int(10+titleH*2+(textH*2)*5+10), 300)
 
 	canvas = gg.NewContext(1000, backDY)
 	// 画底色
@@ -379,7 +380,8 @@ func drawEquipInfoBlock(equipInfo equip, fontdata []byte) (image.Image, error) {
 	canvas.SetColor(color.Black)
 	canvas.DrawStringAnchored(maintenance, textDx+textW+5+barW+5+valueW/2, textDy+textH/2, 0.5, 0.5)
 
-	textDy += textH * 3
+	// 增加行间距，确保附魔信息完整显示
+	textDy += textH * 2.5
 	canvas.DrawString(" 附魔: 诱钓"+enchantLevel[equipInfo.Induce]+"  海之眷顾"+enchantLevel[equipInfo.Favor], textDx, textDy)
 	textDy += textH * 1.5
 	canvas.DrawString(" 附魔: 耐久"+enchantLevel[equipInfo.Moredurable]+"  经验修补"+enchantLevel[equipInfo.Expfix], textDx, textDy)
