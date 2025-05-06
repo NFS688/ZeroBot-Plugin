@@ -115,7 +115,7 @@ func init() {
 		msg := ""
 		if equipInfo.Equip != "美西螈" {
 			i := 0
-			for i <= fishNumber {
+			for i < fishNumber {
 				if rand.Intn(100) < (60 + 40/(equipInfo.Moredurable+1)) {
 					equipInfo.Durable--
 				}
