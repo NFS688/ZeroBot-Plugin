@@ -876,6 +876,25 @@ func (sql *fishdb) migrateEquipTable() error {
 	defer sql.Unlock()
 
 	// 第一部分：迁移equips表
+	// 首先检查表是否存在
+	tables, err := sql.db.ListTables()
+	if err != nil {
+		return err
+	}
+
+	hasEquipsTable := false
+	for _, t := range tables {
+		if t == "equips" {
+			hasEquipsTable = true
+			break
+		}
+	}
+
+	if !hasEquipsTable {
+		return nil
+	}
+
+	// 定义旧的装备结构
 	type oldEquip struct {
 		ID          int64  // 用户
 		Equip       string // 装备名称
@@ -889,7 +908,7 @@ func (sql *fishdb) migrateEquipTable() error {
 	var oldEquips []oldEquip
 	var tempEquip oldEquip
 
-	err := sql.db.FindFor("equips", &tempEquip, "", func() error {
+	err = sql.db.FindFor("equips", &tempEquip, "", func() error {
 		oldEquips = append(oldEquips, tempEquip)
 		return nil
 	})
@@ -897,8 +916,28 @@ func (sql *fishdb) migrateEquipTable() error {
 		return err
 	}
 
-	// 删除旧表
+	// 创建一个新的临时表来存储旧数据
+	err = sql.db.Create("equips_backup", &oldEquip{})
+	if err != nil {
+		return err
+	}
+
+	// 将数据复制到备份表
+	for _, old := range oldEquips {
+		err = sql.db.Insert("equips_backup", &old)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 删除旧表中的数据
 	err = sql.db.Del("equips", "")
+	if err != nil {
+		return err
+	}
+
+	// 删除旧表结构
+	err = sql.db.Drop("equips")
 	if err != nil {
 		return err
 	}
@@ -930,7 +969,7 @@ func (sql *fishdb) migrateEquipTable() error {
 
 	// 第二部分：更新用户背包中的鱼竿other字段格式
 	// 获取所有表名
-	tables, err := sql.db.ListTables()
+	tables, err = sql.db.ListTables()
 	if err != nil {
 		return err
 	}
