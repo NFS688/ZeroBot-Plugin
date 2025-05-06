@@ -255,6 +255,12 @@ func init() {
 				return
 			}
 
+			err = dbdata.migrateStoreTable()
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR] 迁移商店表失败:", err))
+				return
+			}
+
 			ctx.SendChain(message.Text("钓鱼数据库迁移完成！"))
 		}
 	})
@@ -1037,6 +1043,97 @@ func (sql *fishdb) migrateEquipTable() error {
 				if err != nil {
 					continue // 如果插入失败，跳过这条记录
 				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// 迁移商店数据库中的鱼竿附魔格式
+func (sql *fishdb) migrateStoreTable() error {
+	sql.Lock()
+	defer sql.Unlock()
+
+	// 检查store表是否存在
+	tables, err := sql.db.ListTables()
+	if err != nil {
+		return err
+	}
+
+	hasStoreTable := false
+	for _, t := range tables {
+		if t == "store" {
+			hasStoreTable = true
+			break
+		}
+	}
+
+	if !hasStoreTable {
+		return nil
+	}
+
+	// 定义与商店表结构匹配的临时结构体
+	type storeItem struct {
+		Duration int64
+		Name     string
+		Number   int
+		Price    int
+		Other    string
+		Type     string
+	}
+
+	// 获取商店中的所有鱼竿
+	var storeItems []storeItem
+	var tempItem storeItem
+
+	err = sql.db.FindFor("store", &tempItem, "WHERE Type = 'pole'", func() error {
+		storeItems = append(storeItems, tempItem)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 更新每个鱼竿的other字段格式
+	for _, item := range storeItems {
+		if item.Other == "" {
+			continue // 跳过没有Other字段的记录
+		}
+
+		parts := strings.Split(item.Other, "/")
+		if len(parts) < 6 { // 如果格式不完整
+			// 保留现有值
+			durable := "0"
+			maintenance := "0"
+			induce := "0"
+			favor := "0"
+
+			if len(parts) > 0 {
+				durable = parts[0]
+			}
+			if len(parts) > 1 {
+				maintenance = parts[1]
+			}
+			if len(parts) > 2 {
+				induce = parts[2]
+			}
+			if len(parts) > 3 {
+				favor = parts[3]
+			}
+
+			// 添加新字段
+			item.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+
+			// 使用删除再插入的方式更新记录
+			err = sql.db.Del("store", "WHERE Duration = ?", item.Duration)
+			if err != nil {
+				continue // 如果删除失败，跳过这条记录
+			}
+
+			err = sql.db.Insert("store", &item)
+			if err != nil {
+				continue // 如果插入失败，跳过这条记录
 			}
 		}
 	}
