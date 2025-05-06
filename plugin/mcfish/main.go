@@ -928,54 +928,76 @@ func (sql *fishdb) migrateEquipTable() error {
 		}
 	}
 
-	// 第二部分：更新articles表中的other字段格式
-	// 获取所有鱼竿类型的物品
-	var articles []article
-	var tempArticle article
-
-	err = sql.db.FindFor("articles", &tempArticle, "WHERE Type = 'pole'", func() error {
-		articles = append(articles, tempArticle)
-		return nil
-	})
+	// 第二部分：更新用户背包中的鱼竿other字段格式
+	// 获取所有表名
+	tables, err := sql.db.ListTables()
 	if err != nil {
 		return err
 	}
 
-	// 更新每个鱼竿的other字段格式
-	for _, art := range articles {
-		parts := strings.Split(art.Other, "/")
-		if len(parts) < 6 { // 如果格式不完整
-			// 保留现有值
-			durable := "0"
-			maintenance := "0"
-			induce := "0"
-			favor := "0"
+	// 定义与用户背包表结构匹配的临时结构体
+	type packItem struct {
+		Duration int64
+		Name     string
+		Number   int
+		Other    string
+		Type     string
+	}
 
-			if len(parts) > 0 {
-				durable = parts[0]
-			}
-			if len(parts) > 1 {
-				maintenance = parts[1]
-			}
-			if len(parts) > 2 {
-				induce = parts[2]
-			}
-			if len(parts) > 3 {
-				favor = parts[3]
-			}
+	// 筛选出用户背包表（以Pack结尾的表）
+	for _, tableName := range tables {
+		if !strings.HasSuffix(tableName, "Pack") {
+			continue
+		}
 
-			// 添加新字段
-			art.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+		// 获取该用户背包中的所有鱼竿
+		var userItems []packItem
+		var tempItem packItem
 
-			// 使用删除再插入的方式更新记录
-			err = sql.db.Del("articles", "WHERE Duration = ? AND Name = ?", art.Duration, art.Name)
-			if err != nil {
-				return err
-			}
+		err = sql.db.FindFor(tableName, &tempItem, "WHERE Type = 'pole'", func() error {
+			userItems = append(userItems, tempItem)
+			return nil
+		})
+		if err != nil {
+			continue // 如果出错，跳过这个表
+		}
 
-			err = sql.db.Insert("articles", &art)
-			if err != nil {
-				return err
+		// 更新每个鱼竿的other字段格式
+		for _, item := range userItems {
+			parts := strings.Split(item.Other, "/")
+			if len(parts) < 6 { // 如果格式不完整
+				// 保留现有值
+				durable := "0"
+				maintenance := "0"
+				induce := "0"
+				favor := "0"
+
+				if len(parts) > 0 {
+					durable = parts[0]
+				}
+				if len(parts) > 1 {
+					maintenance = parts[1]
+				}
+				if len(parts) > 2 {
+					induce = parts[2]
+				}
+				if len(parts) > 3 {
+					favor = parts[3]
+				}
+
+				// 添加新字段
+				item.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+
+				// 使用删除再插入的方式更新记录
+				err = sql.db.Del(tableName, "WHERE Duration = ? AND Name = ?", item.Duration, item.Name)
+				if err != nil {
+					continue // 如果删除失败，跳过这条记录
+				}
+
+				err = sql.db.Insert(tableName, &item)
+				if err != nil {
+					continue // 如果插入失败，跳过这条记录
+				}
 			}
 		}
 	}

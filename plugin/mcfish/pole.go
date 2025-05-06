@@ -40,6 +40,7 @@ func init() {
 				favorLevel, _ := strconv.Atoi(poleInfo[3])
 				moredurableLevel, _ := strconv.Atoi(poleInfo[4])
 				expfixLevel, _ := strconv.Atoi(poleInfo[5])
+
 				poles = append(poles, equip{
 					ID:          uid,
 					Equip:       info.Name,
