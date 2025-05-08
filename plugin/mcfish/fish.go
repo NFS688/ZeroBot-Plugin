@@ -123,10 +123,10 @@ func init() {
 				if equipInfo.Durable < durationList[equipInfo.Equip] && equipInfo.Expfix > 0 {
 					equipInfo.Durable++
 					money := wallet.GetWalletOf(uid)
-					if money < 2 {
+					if money < 100 {
 						break
 					}
-					err = wallet.InsertWalletOf(uid, -2)
+					err = wallet.InsertWalletOf(uid, -100)
 					if err != nil {
 						ctx.SendChain(message.Text("[ERROR at store.go.10]:", err))
 					}
