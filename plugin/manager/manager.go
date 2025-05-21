@@ -164,7 +164,7 @@ func init() { // 插件主体
 				if targetUserID == superUserID {
 					ctx.SetThisGroupBan(
 						ctx.Event.UserID,
-						10,
+						600,
 					)
 					ctx.SendChain(message.Text("敢禁言超级管理员？罚你禁言10分钟"))
 					return
