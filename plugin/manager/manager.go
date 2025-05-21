@@ -159,6 +159,17 @@ func init() { // 插件主体
 	engine.OnMessage(zero.NewPattern(nil).Text("^禁言").At().Text("(\\d+)\\s*(.*)").AsRule(), zero.OnlyGroup, zero.AdminPermission).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			parsed := ctx.State[zero.KeyPattern].([]zero.PatternParsed)
+			targetUserID := math.Str2Int64(parsed[1].At())
+			for _, superUserID := range zero.BotConfig.SuperUsers {
+				if targetUserID == superUserID {
+					ctx.SetThisGroupBan(
+						ctx.Event.UserID,
+						10,
+					)
+					ctx.SendChain(message.Text("敢禁言超级管理员？罚你禁言10分钟"))
+					return
+				}
+			}
 			duration := math.Str2Int64(parsed[2].Text()[1])
 			switch parsed[2].Text()[2] {
 			case "分钟":
