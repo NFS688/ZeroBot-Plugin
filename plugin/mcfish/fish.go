@@ -22,8 +22,8 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
 			return
 		}
-		if numberOfPole > 30 {
-			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于30支的玩家不允许钓鱼"))
+		if numberOfPole > 100 {
+			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于100支的玩家不允许钓鱼"))
 			return
 		}
 		fishNumber := 1
@@ -114,14 +114,31 @@ func init() {
 		fishNumber = residue
 		msg := ""
 		if equipInfo.Equip != "美西螈" {
-			equipInfo.Durable -= fishNumber
+			i := 0
+			for i < fishNumber {
+				if rand.Intn(100) < (60 + 40/(equipInfo.Moredurable+1)) {
+					equipInfo.Durable--
+				}
+				i++
+				if equipInfo.Durable < durationList[equipInfo.Equip] && equipInfo.Expfix > 0 {
+					equipInfo.Durable++
+					money := wallet.GetWalletOf(uid)
+					if money < 100 {
+						break
+					}
+					err = wallet.InsertWalletOf(uid, -100)
+					if err != nil {
+						ctx.SendChain(message.Text("[ERROR at store.go.10]:", err))
+					}
+				}
+			}
 			err = dbdata.updateUserEquip(equipInfo)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5]:", err))
 				return
 			}
-			if equipInfo.Durable < 10 && equipInfo.Durable > 0 {
-				msg = "(你的鱼竿耐久仅剩" + strconv.Itoa(equipInfo.Durable) + ")"
+			if equipInfo.Durable < durationList[equipInfo.Equip] && equipInfo.Durable > 0 {
+				msg = "(你的鱼竿耐久剩余" + strconv.Itoa(equipInfo.Durable) + ")"
 			} else if equipInfo.Durable <= 0 {
 				msg = "(你的鱼竿已销毁)"
 			}
@@ -252,6 +269,14 @@ func init() {
 					typeOfThing = "fish"
 					picName = "海豚"
 					thingName = "海豚"
+				case dice >= probabilities["耐久"].Min && dice < probabilities["耐久"].Max:
+					typeOfThing = "pole"
+					picName = "耐久"
+					thingName = "耐久"
+				case dice >= probabilities["经验修补"].Min && dice < probabilities["经验修补"].Max:
+					typeOfThing = "pole"
+					picName = "经验修补"
+					thingName = "经验修补"
 				default:
 					typeOfThing = "article"
 					picName = "book"
@@ -299,7 +324,7 @@ func init() {
 				if strings.Contains(thingName, "竿") {
 					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
 						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2))
+						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2)) + "/" + strconv.Itoa(rand.Intn(2))
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,

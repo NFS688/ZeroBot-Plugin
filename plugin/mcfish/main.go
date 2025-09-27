@@ -26,10 +26,10 @@ type fishdb struct {
 }
 
 // FishLimit 钓鱼次数上限
-const FishLimit = 50
+const FishLimit = 2000
 
 // version 规则版本号
-const version = "5.6.2"
+const version = "5.6.3"
 
 // 各物品信息
 type jsonInfo struct {
@@ -60,13 +60,15 @@ type equip struct {
 	Maintenance int    // 维修次数
 	Induce      int    // 诱钓等级
 	Favor       int    // 眷顾等级
+	Moredurable int    // 耐久附魔
+	Expfix      int    // 经验修补
 }
 
 type article struct {
 	Duration int64
 	Name     string
 	Number   int
-	Other    string // 耐久/维修次数/诱钓/眷顾
+	Other    string // 耐久/维修次数/诱钓/眷顾/耐久/经验修补
 	Type     string
 }
 
@@ -75,7 +77,7 @@ type store struct {
 	Name     string
 	Number   int
 	Price    int
-	Other    string // 耐久/维修次数/诱钓/眷顾
+	Other    string // 耐久/维修次数/诱钓/眷顾/耐久/经验修补
 	Type     string
 }
 
@@ -138,7 +140,7 @@ var (
 			"- 购买xxx / 购买xxx [数量]\n- 出售xxx / 出售xxx [数量]\n" +
 			"- 消除[绑定|宝藏]诅咒 / 消除[绑定|宝藏]诅咒 [数量]\n" +
 			"- 装备[xx竿|三叉戟|美西螈]\n" +
-			"- 附魔[诱钓|海之眷顾]\n" +
+			"- 附魔[诱钓|海之眷顾|耐久|经验修补]\n" +
 			"- 合成[xx竿|三叉戟]\n" +
 			"- 出售所有垃圾\n" +
 			"- 当前装备概率明细\n" +
@@ -227,6 +229,41 @@ func init() {
 		minMap[info.Type] += info.Probability
 	}
 	// }()
+
+	engine.OnFullMatch("钓鱼数据库迁移", zero.SuperUserPermission, getdb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+		ctx.SendChain(message.Text("⚠️ 警告：即将迁移钓鱼数据库结构，此操作不可逆。\n请回复「确认迁移」继续，或回复其他内容取消。"))
+
+		recv, cancel := zero.NewFutureEvent("message", 999, false,
+			zero.RegexRule(`^.*$`),
+			zero.CheckUser(ctx.Event.UserID)).Repeat()
+		defer cancel()
+
+		select {
+		case <-time.After(time.Second * 60):
+			ctx.SendChain(message.Text("迁移操作已超时取消"))
+			return
+		case e := <-recv:
+			if e.Event.Message.String() != "确认迁移" {
+				ctx.SendChain(message.Text("已取消迁移操作"))
+				return
+			}
+
+			ctx.SendChain(message.Text("开始迁移钓鱼数据库..."))
+			err := dbdata.migrateEquipTable()
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR] 迁移装备表失败:", err))
+				return
+			}
+
+			err = dbdata.migrateStoreTable()
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR] 迁移商店表失败:", err))
+				return
+			}
+
+			ctx.SendChain(message.Text("钓鱼数据库迁移完成！"))
+		}
+	})
 }
 
 // 更新上限信息
@@ -369,6 +406,11 @@ func (sql *fishdb) updateUserEquip(userInfo equip) (err error) {
 	}
 	if userInfo.Durable == 0 {
 		return sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+	}
+	// 先删除旧记录，再插入新记录，以更新结构
+	err = sql.db.Del("equips", "WHERE ID = ?", userInfo.ID)
+	if err != nil {
+		return
 	}
 	return sql.db.Insert("equips", &userInfo)
 }
@@ -631,7 +673,7 @@ func (sql *fishdb) refreshStroeInfo() (ok bool, err error) {
 			Name:     "初始木竿",
 			Type:     "pole",
 			Price:    priceList["木竿"] + priceList["木竿"]*discountList["木竿"]/100,
-			Other:    "30/0/0/0",
+			Other:    "30/0/0/0/0/0",
 		}
 		_ = sql.db.Find("store", &thingInfo, "WHERE Name = '初始木竿'")
 		thingInfo.Number++
@@ -832,4 +874,269 @@ func checkIsWaste(thing string) bool {
 		}
 	}
 	return false
+}
+
+// 迁移装备数据库结构
+func (sql *fishdb) migrateEquipTable() error {
+	sql.Lock()
+	defer sql.Unlock()
+
+	// 第一部分：迁移equips表
+	// 首先检查表是否存在
+	tables, err := sql.db.ListTables()
+	if err != nil {
+		return err
+	}
+
+	hasEquipsTable := false
+	for _, t := range tables {
+		if t == "equips" {
+			hasEquipsTable = true
+			break
+		}
+	}
+
+	if !hasEquipsTable {
+		return nil
+	}
+
+	// 定义旧的装备结构
+	type oldEquip struct {
+		ID          int64  // 用户
+		Equip       string // 装备名称
+		Durable     int    // 耐久
+		Maintenance int    // 维修次数
+		Induce      int    // 诱钓等级
+		Favor       int    // 眷顾等级
+	}
+
+	// 获取所有现有装备数据
+	var oldEquips []oldEquip
+	var tempEquip oldEquip
+
+	err = sql.db.FindFor("equips", &tempEquip, "", func() error {
+		oldEquips = append(oldEquips, tempEquip)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 创建一个新的临时表来存储旧数据
+	err = sql.db.Create("equips_backup", &oldEquip{})
+	if err != nil {
+		return err
+	}
+
+	// 将数据复制到备份表
+	for _, old := range oldEquips {
+		err = sql.db.Insert("equips_backup", &old)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 删除旧表中的数据
+	err = sql.db.Del("equips", "")
+	if err != nil {
+		return err
+	}
+
+	// 删除旧表结构
+	err = sql.db.Drop("equips")
+	if err != nil {
+		return err
+	}
+
+	// 创建新表结构
+	err = sql.db.Create("equips", &equip{})
+	if err != nil {
+		return err
+	}
+
+	// 将旧数据迁移到新表，为新字段设置默认值
+	for _, old := range oldEquips {
+		newEquip := equip{
+			ID:          old.ID,
+			Equip:       old.Equip,
+			Durable:     old.Durable,
+			Maintenance: old.Maintenance,
+			Induce:      old.Induce,
+			Favor:       old.Favor,
+			Moredurable: 0, // 新字段默认值
+			Expfix:      0, // 新字段默认值
+		}
+
+		err = sql.db.Insert("equips", &newEquip)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 第二部分：更新用户背包中的鱼竿other字段格式
+	// 获取所有表名
+	tables, err = sql.db.ListTables()
+	if err != nil {
+		return err
+	}
+
+	// 定义与用户背包表结构匹配的临时结构体
+	type packItem struct {
+		Duration int64
+		Name     string
+		Number   int
+		Other    string
+		Type     string
+	}
+
+	// 筛选出用户背包表（以Pack结尾的表）
+	for _, tableName := range tables {
+		if !strings.HasSuffix(tableName, "Pack") {
+			continue
+		}
+
+		// 获取该用户背包中的所有鱼竿
+		var userItems []packItem
+		var tempItem packItem
+
+		err = sql.db.FindFor(tableName, &tempItem, "WHERE Type = 'pole'", func() error {
+			userItems = append(userItems, tempItem)
+			return nil
+		})
+		if err != nil {
+			continue // 如果出错，跳过这个表
+		}
+
+		// 更新每个鱼竿的other字段格式
+		for _, item := range userItems {
+			parts := strings.Split(item.Other, "/")
+			if len(parts) < 6 { // 如果格式不完整
+				// 保留现有值
+				durable := "0"
+				maintenance := "0"
+				induce := "0"
+				favor := "0"
+
+				if len(parts) > 0 {
+					durable = parts[0]
+				}
+				if len(parts) > 1 {
+					maintenance = parts[1]
+				}
+				if len(parts) > 2 {
+					induce = parts[2]
+				}
+				if len(parts) > 3 {
+					favor = parts[3]
+				}
+
+				// 添加新字段
+				item.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+
+				// 使用删除再插入的方式更新记录
+				err = sql.db.Del(tableName, "WHERE Duration = ? AND Name = ?", item.Duration, item.Name)
+				if err != nil {
+					continue // 如果删除失败，跳过这条记录
+				}
+
+				err = sql.db.Insert(tableName, &item)
+				if err != nil {
+					continue // 如果插入失败，跳过这条记录
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// 迁移商店数据库中的鱼竿附魔格式
+func (sql *fishdb) migrateStoreTable() error {
+	sql.Lock()
+	defer sql.Unlock()
+
+	// 检查store表是否存在
+	tables, err := sql.db.ListTables()
+	if err != nil {
+		return err
+	}
+
+	hasStoreTable := false
+	for _, t := range tables {
+		if t == "store" {
+			hasStoreTable = true
+			break
+		}
+	}
+
+	if !hasStoreTable {
+		return nil
+	}
+
+	// 定义与商店表结构匹配的临时结构体
+	type storeItem struct {
+		Duration int64
+		Name     string
+		Number   int
+		Price    int
+		Other    string
+		Type     string
+	}
+
+	// 获取商店中的所有鱼竿
+	var storeItems []storeItem
+	var tempItem storeItem
+
+	err = sql.db.FindFor("store", &tempItem, "WHERE Type = 'pole'", func() error {
+		storeItems = append(storeItems, tempItem)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 更新每个鱼竿的other字段格式
+	for _, item := range storeItems {
+		if item.Other == "" {
+			continue // 跳过没有Other字段的记录
+		}
+
+		parts := strings.Split(item.Other, "/")
+		if len(parts) < 6 { // 如果格式不完整
+			// 保留现有值
+			durable := "0"
+			maintenance := "0"
+			induce := "0"
+			favor := "0"
+
+			if len(parts) > 0 {
+				durable = parts[0]
+			}
+			if len(parts) > 1 {
+				maintenance = parts[1]
+			}
+			if len(parts) > 2 {
+				induce = parts[2]
+			}
+			if len(parts) > 3 {
+				favor = parts[3]
+			}
+
+			// 添加新字段
+			item.Other = durable + "/" + maintenance + "/" + induce + "/" + favor + "/0/0"
+
+			// 使用删除再插入的方式更新记录
+			err = sql.db.Del("store", "WHERE Duration = ?", item.Duration)
+			if err != nil {
+				continue // 如果删除失败，跳过这条记录
+			}
+
+			err = sql.db.Insert("store", &item)
+			if err != nil {
+				continue // 如果插入失败，跳过这条记录
+			}
+		}
+	}
+
+	return nil
 }
