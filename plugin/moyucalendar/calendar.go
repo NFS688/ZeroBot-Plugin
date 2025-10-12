@@ -19,7 +19,7 @@ func init() {
 			"   - 摸鱼人日历",
 	}).OnFullMatch("摸鱼人日历").SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
-			data, err := web.GetData("https://api.vvhan.com/api/moyu")
+			data, err := web.GetData("https://api.zxki.cn/api/myrl")
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
